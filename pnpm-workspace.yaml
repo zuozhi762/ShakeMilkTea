@@ -1,0 +1,24 @@
+packages:
+  - '.'
+
+allowBuilds:
+  '@cloudflare/workerd-darwin-64': true
+  '@cloudflare/workerd-darwin-arm64': true
+  '@cloudflare/workerd-linux-64': true
+  '@cloudflare/workerd-linux-arm64': true
+  '@cloudflare/workerd-windows-64': true
+  '@next/swc-darwin-arm64': true
+  '@next/swc-darwin-x64': true
+  '@next/swc-linux-arm64-gnu': true
+  '@next/swc-linux-arm64-musl': true
+  '@next/swc-linux-x64-gnu': true
+  '@next/swc-linux-x64-musl': true
+  '@next/swc-win32-arm64-msvc': true
+  '@next/swc-win32-x64-msvc': true
+  '@tailwindcss/oxide': true
+  '@tailwindcss/oxide-linux-x64-gnu': true
+  '@tailwindcss/oxide-linux-x64-musl': true
+  '@tailwindcss/oxide-win32-x64-msvc': true
+  esbuild: true
+  sharp: true
+  workerd: true
