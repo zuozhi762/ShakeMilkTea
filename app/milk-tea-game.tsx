@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { IMAGE_ASSETS, TOPPING_LEVELS, getAssetUrl, type ImageAssetId } from "./image-assets";
 
 const WIDTH = 390;
 const HEIGHT = 700;
@@ -20,18 +21,8 @@ const TXT = {
   strawActive: "\u{1f964} \u5438\u7ba1\u6b63\u5728\u5438\uff01\u522b\u9760\u592a\u8fd1\uff01",
 };
 
-const LEVELS = [
-  { level: 1, name: "\u897f\u7c73", emoji: "\u26aa", scale: 1.0, color: "#fff8e7" },
-  { level: 2, name: "\u8292\u679c\u7c92", emoji: "\u{1f7e8}", scale: 1.15, color: "#ffd447" },
-  { level: 3, name: "\u6930\u679c\u7c92", emoji: "\u25fb\ufe0f", scale: 1.3, color: "#f8fafc" },
-  { level: 4, name: "\u73cd\u73e0", emoji: "\u26ab", scale: 1.45, color: "#211817" },
-  { level: 5, name: "\u7ea2\u8c46", emoji: "\u{1fad8}", scale: 1.6, color: "#9b2f2f" },
-  { level: 6, name: "\u5e03\u4e01", emoji: "\u{1f36e}", scale: 1.8, color: "#f3b347" },
-  { level: 7, name: "\u4ed9\u8349", emoji: "\u{1f7eb}", scale: 2.0, color: "#3f2925" },
-  { level: 8, name: "\u828b\u5706", emoji: "\u{1f7e3}", scale: 2.25, color: "#a26be8" },
-  { level: 9, name: "\u5976\u76d6\u7403", emoji: "\u{1f365}", scale: 2.5, color: "#ffe2ef" },
-  { level: 10, name: "\u67ff\u5b50", emoji: "\u{1f7e0}", scale: 2.8, color: "#ff8a1c" },
-] as const;
+const LEVELS = TOPPING_LEVELS;
+type AssetImageMap = Partial<Record<ImageAssetId, HTMLImageElement>>;
 
 type Status = "menu" | "playing" | "won" | "lost" | "leaderboard";
 type EventKind = "idle" | "shakeWarning" | "shaking" | "strawWarning" | "strawActive";
@@ -101,20 +92,26 @@ function triggerStraw(runtime: Runtime, now: number) { const p = randomCupPoint(
 function strawCenter(runtime: Runtime, now: number) { const baseX = runtime.event.x ?? CUP.centerX, baseY = runtime.event.y ?? CUP.topY + 320, d = Math.min(runtime.elapsed / 160000, 1); const y = clamp(baseY + (runtime.elapsed > 80000 ? Math.cos(now / 430) * 48 * d : 0), CUP.topY + 120, CUP.bottomY - 120); const b = cupBoundsAt(y, 42); return { x: clamp(baseX + Math.sin(now / 360) * 60 * (0.45 + d), b.left, b.right), y }; }
 function keepInCup(item: { x: number; y: number; vx: number; vy: number; radius: number }) { const oldX = item.x, oldY = item.y; const p = clampPointToCup(item.x, item.y, item.radius); item.x = p.x; item.y = p.y; if (Math.abs(item.x - oldX) > 0.01) item.vx *= -0.72; if (Math.abs(item.y - oldY) > 0.01) item.vy *= -0.72; }
 function drawCupPath(ctx: CanvasRenderingContext2D, expand = 0) { const topHalf = CUP.topW / 2 + expand, bottomHalf = CUP.bottomW / 2 + expand; ctx.beginPath(); ctx.moveTo(CUP.centerX - topHalf, CUP.topY - expand); ctx.lineTo(CUP.centerX + topHalf, CUP.topY - expand); ctx.lineTo(CUP.centerX + bottomHalf, CUP.bottomY + expand); ctx.lineTo(CUP.centerX - bottomHalf, CUP.bottomY + expand); ctx.closePath(); }
-function drawIngredient(ctx: CanvasRenderingContext2D, item: { x: number; y: number; radius: number; level: number }, isPlayer = false) {
+function drawIngredient(ctx: CanvasRenderingContext2D, item: { x: number; y: number; radius: number; level: number }, isPlayer = false, assets: AssetImageMap = {}) {
   const lv = levelInfo(item.level); ctx.save(); ctx.translate(item.x, item.y);
   ctx.fillStyle = isPlayer ? "rgba(255, 244, 166, 0.58)" : "rgba(255, 255, 255, 0.18)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + (isPlayer ? 9 : 3), 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = isPlayer ? "rgba(255, 255, 255, 0.92)" : "rgba(255, 255, 255, 0.68)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + 2, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = lv.color; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI * 2); ctx.fill();
-  ctx.font = Math.round(item.radius * 1.55) + "px Apple Color Emoji, Segoe UI Emoji, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(lv.emoji, 0, 1);
+  const image = assets[lv.assetId];
+  if (image?.complete && image.naturalWidth > 0) {
+    const size = item.radius * 2.65;
+    ctx.drawImage(image, -size / 2, -size / 2, size, size);
+  } else {
+    ctx.fillStyle = lv.color; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI * 2); ctx.fill();
+    ctx.font = Math.round(item.radius * 1.55) + "px Apple Color Emoji, Segoe UI Emoji, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(lv.emoji, 0, 1);
+  }
   if (isPlayer) { ctx.strokeStyle = "rgba(126, 60, 16, 0.9)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, item.radius + 5, 0, Math.PI * 2); ctx.stroke(); }
   ctx.restore();
 }
-function drawPlayerWithCarried(ctx: CanvasRenderingContext2D, runtime: Runtime) {
-  const player = runtime.player; drawIngredient(ctx, player, true);
+function drawPlayerWithCarried(ctx: CanvasRenderingContext2D, runtime: Runtime, assets: AssetImageMap) {
+  const player = runtime.player; drawIngredient(ctx, player, true, assets);
   const pieces: number[] = []; player.carried.forEach((count, level) => { for (let i = 0; i < count; i += 1) pieces.push(level); });
   const time = runtime.elapsed / 1000;
-  pieces.forEach((level, index) => { if (level <= 0) return; const ring = Math.floor(index / 12), slot = index % 12; const angle = slot / 12 * Math.PI * 2 + ring * 0.38 + time * (0.8 + ring * 0.12); const orbit = player.radius + 8 + ring * 8.5 + Math.sin(time * 4.2 + index) * 2.2; const pieceRadius = clamp(radiusForLevel(level) * 0.44, 4.2, Math.max(5.2, player.radius * 0.44)); drawIngredient(ctx, { x: player.x + Math.cos(angle) * orbit, y: player.y + Math.sin(angle) * orbit, level, radius: pieceRadius }); });
+  pieces.forEach((level, index) => { if (level <= 0) return; const ring = Math.floor(index / 12), slot = index % 12; const angle = slot / 12 * Math.PI * 2 + ring * 0.38 + time * (0.8 + ring * 0.12); const orbit = player.radius + 8 + ring * 8.5 + Math.sin(time * 4.2 + index) * 2.2; const pieceRadius = clamp(radiusForLevel(level) * 0.44, 4.2, Math.max(5.2, player.radius * 0.44)); drawIngredient(ctx, { x: player.x + Math.cos(angle) * orbit, y: player.y + Math.sin(angle) * orbit, level, radius: pieceRadius }, false, assets); });
 }
 function drawWorldBackground(ctx: CanvasRenderingContext2D, runtime: Runtime | null) {
   const bg = ctx.createLinearGradient(0, 0, 0, WORLD_HEIGHT); bg.addColorStop(0, "#fff2c9"); bg.addColorStop(0.45, "#f0b967"); bg.addColorStop(1, "#98542d"); ctx.fillStyle = bg; ctx.fillRect(-200, -200, WORLD_WIDTH + 400, WORLD_HEIGHT + 400);
@@ -122,7 +119,7 @@ function drawWorldBackground(ctx: CanvasRenderingContext2D, runtime: Runtime | n
   ctx.strokeStyle = "rgba(255,255,255,0.16)"; ctx.lineWidth = 3; const shift = runtime ? runtime.elapsed / 180 : 0;
   for (let line = 0; line < 14; line += 1) { ctx.beginPath(); const y = 80 + line * 86; for (let x = -40; x <= WORLD_WIDTH + 40; x += 18) { const wy = y + Math.sin((x + shift + line * 41) / 31) * 8; if (x === -40) ctx.moveTo(x, wy); else ctx.lineTo(x, wy); } ctx.stroke(); }
 }
-function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, status: Status) {
+function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, status: Status, assets: AssetImageMap = {}) {
   ctx.clearRect(0, 0, WIDTH, HEIGHT); const screenBg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT); screenBg.addColorStop(0, "#fff7da"); screenBg.addColorStop(1, "#a76538"); ctx.fillStyle = screenBg; ctx.fillRect(0, 0, WIDTH, HEIGHT);
   ctx.save(); if (runtime) { ctx.scale(VIEW_SCALE, VIEW_SCALE); ctx.translate(-runtime.camera.x, -runtime.camera.y); } else { ctx.translate((WIDTH - WORLD_WIDTH * 0.42) / 2, 35); ctx.scale(0.42, 0.42); }
   ctx.save(); if (runtime) { ctx.translate(CUP_CENTER.x, CUP_CENTER.y); ctx.rotate(runtime.shakeAngle); ctx.translate(-CUP_CENTER.x, -CUP_CENTER.y); }
@@ -132,7 +129,7 @@ function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, statu
   if (runtime) {
     if (runtime.event.kind === "shakeWarning" || runtime.event.kind === "shaking") { ctx.strokeStyle = runtime.event.kind === "shaking" ? "rgba(255,255,255,0.52)" : "rgba(255,224,86,0.7)"; ctx.lineWidth = 8; for (let i = 0; i < 6; i += 1) { ctx.beginPath(); const y = CUP.topY + 120 + i * 160; ctx.moveTo(CUP.centerX - 190, y); ctx.bezierCurveTo(CUP.centerX - 80, y - 80, CUP.centerX + 80, y + 80, CUP.centerX + 190, y); ctx.stroke(); } }
     if (runtime.event.kind === "strawWarning" || runtime.event.kind === "strawActive") { const c = runtime.event.kind === "strawActive" ? strawCenter(runtime, performance.now()) : { x: runtime.event.x ?? CUP.centerX, y: runtime.event.y ?? 320 }; ctx.fillStyle = runtime.event.kind === "strawActive" ? "rgba(255,52,88,0.16)" : "rgba(255,52,88,0.24)"; ctx.beginPath(); ctx.arc(c.x, c.y, 245, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "rgba(255,52,88,0.68)"; ctx.lineWidth = 4; ctx.setLineDash([12, 10]); ctx.beginPath(); ctx.arc(c.x, c.y, 62, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); if (runtime.event.kind === "strawActive") for (let ring = 0; ring < 6; ring += 1) { ctx.strokeStyle = "rgba(255,255,255," + (0.5 - ring * 0.06) + ")"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(c.x, c.y, 45 + ring * 42 + Math.sin(runtime.elapsed / 72 + ring) * 10, 0.2 + ring, Math.PI * 1.66 + ring); ctx.stroke(); } }
-    runtime.toppings.slice().sort((a, b) => a.level - b.level).forEach((item) => drawIngredient(ctx, item)); drawPlayerWithCarried(ctx, runtime);
+    runtime.toppings.slice().sort((a, b) => a.level - b.level).forEach((item) => drawIngredient(ctx, item, false, assets)); drawPlayerWithCarried(ctx, runtime, assets);
     if (runtime.event.kind === "strawActive") { const c = strawCenter(runtime, performance.now()); ctx.save(); ctx.lineCap = "round"; ctx.lineWidth = 22; ctx.strokeStyle = "#ff7b93"; ctx.beginPath(); ctx.moveTo(c.x - 70, CUP.topY - 115); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.lineWidth = 8; ctx.strokeStyle = "rgba(255,255,255,0.92)"; ctx.setLineDash([22, 20]); ctx.beginPath(); ctx.moveTo(c.x - 70, CUP.topY - 115); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.restore(); }
   } else { ctx.font = "132px sans-serif"; ctx.textAlign = "center"; ctx.fillText("\u{1f9cb}", CUP.centerX, CUP_CENTER.y + 40); }
   ctx.restore(); ctx.restore(); ctx.restore(); ctx.fillStyle = "rgba(77,39,20,0.18)"; ctx.fillRect(0, HEIGHT - 28, WIDTH, 28); if (status !== "playing") { ctx.fillStyle = "rgba(67,31,16,0.22)"; ctx.fillRect(0, 0, WIDTH, HEIGHT); }
@@ -157,13 +154,30 @@ function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (resul
 }
 
 export function MilkTeaGame() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null); const runtimeRef = useRef<Runtime | null>(null); const [status, setStatus] = useState<Status>("menu"); const [hud, setHud] = useState<Hud>({ level: 1, progress: 1, score: 0, elapsed: 0, message: TXT.defaultHint }); const [finalStats, setFinalStats] = useState<FinalStats | null>(null); const [leaderboard, setLeaderboard] = useState<ScoreRecord[]>([]); const [playerName, setPlayerName] = useState(TXT.defaultName); const [saved, setSaved] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null); const runtimeRef = useRef<Runtime | null>(null); const assetImagesRef = useRef<AssetImageMap>({}); const [assetRevision, setAssetRevision] = useState(0); const [status, setStatus] = useState<Status>("menu"); const [hud, setHud] = useState<Hud>({ level: 1, progress: 1, score: 0, elapsed: 0, message: TXT.defaultHint }); const [finalStats, setFinalStats] = useState<FinalStats | null>(null); const [leaderboard, setLeaderboard] = useState<ScoreRecord[]>([]); const [playerName, setPlayerName] = useState(TXT.defaultName); const [saved, setSaved] = useState(false);
+  const updateTargetFromClient = (clientX: number, clientY: number) => { const canvas = canvasRef.current, runtime = runtimeRef.current; if (!canvas || !runtime || !runtime.running) return; const rect = canvas.getBoundingClientRect(); let x = ((clientX - rect.left) / rect.width) * WIDTH / VIEW_SCALE + runtime.camera.x; let y = ((clientY - rect.top) / rect.height) * HEIGHT / VIEW_SCALE + runtime.camera.y; if (Math.abs(runtime.shakeAngle) > 0.001) { const dx = x - CUP_CENTER.x, dy = y - CUP_CENTER.y, c = Math.cos(-runtime.shakeAngle), s = Math.sin(-runtime.shakeAngle); x = CUP_CENTER.x + dx * c - dy * s; y = CUP_CENTER.y + dx * s + dy * c; } runtime.target = { x, y, active: true }; };
+  useEffect(() => {
+    let disposed = false;
+    IMAGE_ASSETS.forEach((asset) => {
+      const url = getAssetUrl(asset);
+      if (!url) return;
+      const image = new Image();
+      image.onload = () => {
+        if (disposed) return;
+        assetImagesRef.current[asset.id] = image;
+        setAssetRevision((value) => value + 1);
+      };
+      image.src = url;
+    });
+    return () => { disposed = true; };
+  }, []);
   useEffect(() => { setLeaderboard(loadLeaderboard()); }, []);
   useEffect(() => { const down = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k)) { e.preventDefault(); runtimeRef.current?.keys.add(k); } }; const up = (e: KeyboardEvent) => runtimeRef.current?.keys.delete(e.key.toLowerCase()); window.addEventListener("keydown", down); window.addEventListener("keyup", up); return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); }; }, []);
-  useEffect(() => { const canvas = canvasRef.current, ctx = canvas?.getContext("2d"); if (!ctx || !canvas) return; let frame = 0; const finish = (result: "won" | "lost", reason: string) => { const runtime = runtimeRef.current; if (!runtime || !runtime.running) return; runtime.running = false; setFinalStats({ result, reason, score: runtime.score, elapsed: runtime.elapsed, highestLevel: runtime.highestLevel }); setSaved(false); setStatus(result); }; const loop = (now: number) => { const runtime = runtimeRef.current; if (!runtime || !runtime.running) return; const dt = Math.min(0.033, Math.max(0.001, (now - runtime.lastTime) / 1000)); runtime.lastTime = now; updateRuntime(runtime, dt, now, finish); drawScene(ctx, runtime, "playing"); if (now - runtime.lastHudAt > 100) { runtime.lastHudAt = now; setHud({ level: runtime.player.level, progress: runtime.player.progress, score: runtime.score, elapsed: runtime.elapsed, message: eventMessage(runtime.event) }); } frame = window.requestAnimationFrame(loop); }; if (status === "playing") frame = window.requestAnimationFrame(loop); else drawScene(ctx, runtimeRef.current, status); return () => window.cancelAnimationFrame(frame); }, [status]);
+  useEffect(() => { if (status !== "playing") return; const move = (event: PointerEvent) => updateTargetFromClient(event.clientX, event.clientY); window.addEventListener("pointermove", move); return () => window.removeEventListener("pointermove", move); }, [status]);
+  useEffect(() => { const canvas = canvasRef.current, ctx = canvas?.getContext("2d"); if (!ctx || !canvas) return; let frame = 0; const finish = (result: "won" | "lost", reason: string) => { const runtime = runtimeRef.current; if (!runtime || !runtime.running) return; runtime.running = false; setFinalStats({ result, reason, score: runtime.score, elapsed: runtime.elapsed, highestLevel: runtime.highestLevel }); setSaved(false); setStatus(result); }; const loop = (now: number) => { const runtime = runtimeRef.current; if (!runtime || !runtime.running) return; const dt = Math.min(0.033, Math.max(0.001, (now - runtime.lastTime) / 1000)); runtime.lastTime = now; updateRuntime(runtime, dt, now, finish); drawScene(ctx, runtime, "playing", assetImagesRef.current); if (now - runtime.lastHudAt > 100) { runtime.lastHudAt = now; setHud({ level: runtime.player.level, progress: runtime.player.progress, score: runtime.score, elapsed: runtime.elapsed, message: eventMessage(runtime.event) }); } frame = window.requestAnimationFrame(loop); }; if (status === "playing") frame = window.requestAnimationFrame(loop); else drawScene(ctx, runtimeRef.current, status, assetImagesRef.current); return () => window.cancelAnimationFrame(frame); }, [status, assetRevision]);
   const startGame = () => { const runtime = createRuntime(); runtimeRef.current = runtime; setFinalStats(null); setSaved(false); setHud({ level: 1, progress: 1, score: 0, elapsed: 0, message: TXT.defaultHint }); setStatus("playing"); };
   const openLeaderboard = () => { setLeaderboard(loadLeaderboard()); setStatus("leaderboard"); };
-  const handlePointer = (event: React.PointerEvent<HTMLCanvasElement>) => { const canvas = canvasRef.current, runtime = runtimeRef.current; if (!canvas || !runtime) return; const rect = canvas.getBoundingClientRect(); let x = ((event.clientX - rect.left) / rect.width) * WIDTH / VIEW_SCALE + runtime.camera.x; let y = ((event.clientY - rect.top) / rect.height) * HEIGHT / VIEW_SCALE + runtime.camera.y; if (Math.abs(runtime.shakeAngle) > 0.001) { const dx = x - CUP_CENTER.x, dy = y - CUP_CENTER.y, c = Math.cos(-runtime.shakeAngle), s = Math.sin(-runtime.shakeAngle); x = CUP_CENTER.x + dx * c - dy * s; y = CUP_CENTER.y + dx * s + dy * c; } if (event.type === "pointerdown") event.currentTarget.setPointerCapture(event.pointerId); runtime.target = { x, y, active: true }; };
+  const handlePointer = (event: React.PointerEvent<HTMLCanvasElement>) => { if (event.type === "pointerdown") event.currentTarget.setPointerCapture(event.pointerId); updateTargetFromClient(event.clientX, event.clientY); };
   const stopPointer = () => { if (runtimeRef.current) runtimeRef.current.target.active = false; };
   const persistScore = () => { if (!finalStats || saved) return; const next = saveLeaderboard({ name: (playerName.trim() || TXT.defaultName).slice(0, 12), score: finalStats.score, elapsed: finalStats.elapsed, highestLevel: finalStats.highestLevel, result: finalStats.result, date: new Date().toLocaleString("zh-CN") }); setLeaderboard(next); setSaved(true); };
   const current = levelInfo(hud.level), next = hud.level < 10 ? levelInfo(hud.level + 1) : null, finalLevelName = finalStats ? levelInfo(finalStats.highestLevel).name : current.name;
