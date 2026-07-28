@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { IMAGE_ASSETS, TOPPING_LEVELS, getAssetUrl, type ImageAssetId } from "./image-assets";
+import { IMAGE_ASSETS, TOPPING_LEVELS, getAssetById, getAssetUrl, type ImageAssetId } from "./image-assets";
 
 const WIDTH = 390;
 const HEIGHT = 700;
@@ -23,6 +23,15 @@ const TXT = {
 
 const LEVELS = TOPPING_LEVELS;
 type AssetImageMap = Partial<Record<ImageAssetId, HTMLImageElement>>;
+
+const assetUrl = (id: ImageAssetId) => {
+  const asset = getAssetById(id);
+  return asset ? getAssetUrl(asset) : null;
+};
+const assetImage = (assets: AssetImageMap, id: ImageAssetId) => {
+  const image = assets[id];
+  return image?.complete && image.naturalWidth > 0 ? image : null;
+};
 
 type Status = "menu" | "playing" | "won" | "lost" | "leaderboard";
 type EventKind = "idle" | "shakeWarning" | "shaking" | "strawWarning" | "strawActive";
@@ -92,12 +101,27 @@ function triggerStraw(runtime: Runtime, now: number) { const p = randomCupPoint(
 function strawCenter(runtime: Runtime, now: number) { const baseX = runtime.event.x ?? CUP.centerX, baseY = runtime.event.y ?? CUP.topY + 320, d = Math.min(runtime.elapsed / 160000, 1); const y = clamp(baseY + (runtime.elapsed > 80000 ? Math.cos(now / 430) * 48 * d : 0), CUP.topY + 120, CUP.bottomY - 120); const b = cupBoundsAt(y, 42); return { x: clamp(baseX + Math.sin(now / 360) * 60 * (0.45 + d), b.left, b.right), y }; }
 function keepInCup(item: { x: number; y: number; vx: number; vy: number; radius: number }) { const oldX = item.x, oldY = item.y; const p = clampPointToCup(item.x, item.y, item.radius); item.x = p.x; item.y = p.y; if (Math.abs(item.x - oldX) > 0.01) item.vx *= -0.72; if (Math.abs(item.y - oldY) > 0.01) item.vy *= -0.72; }
 function drawCupPath(ctx: CanvasRenderingContext2D, expand = 0) { const topHalf = CUP.topW / 2 + expand, bottomHalf = CUP.bottomW / 2 + expand; ctx.beginPath(); ctx.moveTo(CUP.centerX - topHalf, CUP.topY - expand); ctx.lineTo(CUP.centerX + topHalf, CUP.topY - expand); ctx.lineTo(CUP.centerX + bottomHalf, CUP.bottomY + expand); ctx.lineTo(CUP.centerX - bottomHalf, CUP.bottomY + expand); ctx.closePath(); }
+function drawAssetCentered(ctx: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, width: number, height: number, alpha = 1) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(image, x - width / 2, y - height / 2, width, height);
+  ctx.restore();
+}
+
+function drawAssetBetween(ctx: CanvasRenderingContext2D, image: HTMLImageElement, from: { x: number; y: number }, to: { x: number; y: number }, width: number, extra = 76) {
+  const dx = to.x - from.x, dy = to.y - from.y, length = Math.hypot(dx, dy) + extra;
+  ctx.save();
+  ctx.translate((from.x + to.x) / 2, (from.y + to.y) / 2);
+  ctx.rotate(Math.atan2(dy, dx) - Math.PI / 2);
+  ctx.drawImage(image, -width / 2, -length / 2, width, length);
+  ctx.restore();
+}
 function drawIngredient(ctx: CanvasRenderingContext2D, item: { x: number; y: number; radius: number; level: number }, isPlayer = false, assets: AssetImageMap = {}) {
   const lv = levelInfo(item.level); ctx.save(); ctx.translate(item.x, item.y);
   ctx.fillStyle = isPlayer ? "rgba(255, 244, 166, 0.58)" : "rgba(255, 255, 255, 0.18)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + (isPlayer ? 9 : 3), 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = isPlayer ? "rgba(255, 255, 255, 0.92)" : "rgba(255, 255, 255, 0.68)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + 2, 0, Math.PI * 2); ctx.fill();
-  const image = assets[lv.assetId];
-  if (image?.complete && image.naturalWidth > 0) {
+  const image = assetImage(assets, lv.assetId);
+  if (image) {
     const size = item.radius * 2.65;
     ctx.drawImage(image, -size / 2, -size / 2, size, size);
   } else {
@@ -124,14 +148,48 @@ function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, statu
   ctx.save(); if (runtime) { ctx.scale(VIEW_SCALE, VIEW_SCALE); ctx.translate(-runtime.camera.x, -runtime.camera.y); } else { ctx.translate((WIDTH - WORLD_WIDTH * 0.42) / 2, 35); ctx.scale(0.42, 0.42); }
   ctx.save(); if (runtime) { ctx.translate(CUP_CENTER.x, CUP_CENTER.y); ctx.rotate(runtime.shakeAngle); ctx.translate(-CUP_CENTER.x, -CUP_CENTER.y); }
   drawWorldBackground(ctx, runtime); drawCupPath(ctx, 12); ctx.fillStyle = "rgba(255,255,255,0.26)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.82)"; ctx.lineWidth = 7; ctx.stroke();
+  const cupImage = assetImage(assets, "scene-milk-tea-cup");
+  if (cupImage) drawAssetCentered(ctx, cupImage, CUP.centerX, CUP_CENTER.y, CUP.topW + 86, CUP.bottomY - CUP.topY + 110, 0.45);
   drawCupPath(ctx); const tea = ctx.createLinearGradient(0, CUP.topY, 0, CUP.bottomY); tea.addColorStop(0, "rgba(255,219,147,0.76)"); tea.addColorStop(0.48, "rgba(188,113,56,0.86)"); tea.addColorStop(1, "rgba(103,54,30,0.92)"); ctx.fillStyle = tea; ctx.fill();
+  const teaSurface = assetImage(assets, "scene-tea-surface");
+  if (teaSurface) {
+    ctx.save();
+    drawCupPath(ctx); ctx.clip();
+    const pattern = ctx.createPattern(teaSurface, "repeat");
+    if (pattern) {
+      ctx.globalAlpha = 0.34;
+      ctx.translate(runtime ? runtime.elapsed / -90 : 0, runtime ? runtime.elapsed / 150 : 0);
+      ctx.fillStyle = pattern;
+      ctx.fillRect(-280, CUP.topY - 80, WORLD_WIDTH + 560, CUP.bottomY - CUP.topY + 180);
+    }
+    ctx.restore();
+  }
   ctx.save(); drawCupPath(ctx); ctx.clip();
   if (runtime) {
-    if (runtime.event.kind === "shakeWarning" || runtime.event.kind === "shaking") { ctx.strokeStyle = runtime.event.kind === "shaking" ? "rgba(255,255,255,0.52)" : "rgba(255,224,86,0.7)"; ctx.lineWidth = 8; for (let i = 0; i < 6; i += 1) { ctx.beginPath(); const y = CUP.topY + 120 + i * 160; ctx.moveTo(CUP.centerX - 190, y); ctx.bezierCurveTo(CUP.centerX - 80, y - 80, CUP.centerX + 80, y + 80, CUP.centerX + 190, y); ctx.stroke(); } }
-    if (runtime.event.kind === "strawWarning" || runtime.event.kind === "strawActive") { const c = runtime.event.kind === "strawActive" ? strawCenter(runtime, performance.now()) : { x: runtime.event.x ?? CUP.centerX, y: runtime.event.y ?? 320 }; ctx.fillStyle = runtime.event.kind === "strawActive" ? "rgba(255,52,88,0.16)" : "rgba(255,52,88,0.24)"; ctx.beginPath(); ctx.arc(c.x, c.y, 245, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "rgba(255,52,88,0.68)"; ctx.lineWidth = 4; ctx.setLineDash([12, 10]); ctx.beginPath(); ctx.arc(c.x, c.y, 62, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); if (runtime.event.kind === "strawActive") for (let ring = 0; ring < 6; ring += 1) { ctx.strokeStyle = "rgba(255,255,255," + (0.5 - ring * 0.06) + ")"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(c.x, c.y, 45 + ring * 42 + Math.sin(runtime.elapsed / 72 + ring) * 10, 0.2 + ring, Math.PI * 1.66 + ring); ctx.stroke(); } }
+    if (runtime.event.kind === "shakeWarning" || runtime.event.kind === "shaking") {
+      const waveImage = assetImage(assets, "effect-shake-wave");
+      if (waveImage) {
+        const alpha = runtime.event.kind === "shaking" ? 0.58 : 0.42;
+        for (let i = 0; i < 5; i += 1) drawAssetCentered(ctx, waveImage, CUP.centerX + Math.sin(runtime.elapsed / 120 + i) * 36, CUP.topY + 150 + i * 180, 430, 122, alpha);
+      } else {
+        ctx.strokeStyle = runtime.event.kind === "shaking" ? "rgba(255,255,255,0.52)" : "rgba(255,224,86,0.7)"; ctx.lineWidth = 8; for (let i = 0; i < 6; i += 1) { ctx.beginPath(); const y = CUP.topY + 120 + i * 160; ctx.moveTo(CUP.centerX - 190, y); ctx.bezierCurveTo(CUP.centerX - 80, y - 80, CUP.centerX + 80, y + 80, CUP.centerX + 190, y); ctx.stroke(); }
+      }
+    }
+    if (runtime.event.kind === "strawWarning" || runtime.event.kind === "strawActive") {
+      const c = runtime.event.kind === "strawActive" ? strawCenter(runtime, performance.now()) : { x: runtime.event.x ?? CUP.centerX, y: runtime.event.y ?? 320 };
+      const ringImage = assetImage(assets, "effect-suction-ring");
+      if (ringImage) drawAssetCentered(ctx, ringImage, c.x, c.y, 142, 142, runtime.event.kind === "strawActive" ? 0.74 : 0.6);
+      else { ctx.fillStyle = runtime.event.kind === "strawActive" ? "rgba(255,52,88,0.16)" : "rgba(255,52,88,0.24)"; ctx.beginPath(); ctx.arc(c.x, c.y, 245, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "rgba(255,52,88,0.68)"; ctx.lineWidth = 4; ctx.setLineDash([12, 10]); ctx.beginPath(); ctx.arc(c.x, c.y, 62, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+      if (runtime.event.kind === "strawActive") for (let ring = 0; ring < 6; ring += 1) { ctx.strokeStyle = "rgba(255,255,255," + (0.5 - ring * 0.06) + ")"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(c.x, c.y, 45 + ring * 42 + Math.sin(runtime.elapsed / 72 + ring) * 10, 0.2 + ring, Math.PI * 1.66 + ring); ctx.stroke(); }
+    }
     runtime.toppings.slice().sort((a, b) => a.level - b.level).forEach((item) => drawIngredient(ctx, item, false, assets)); drawPlayerWithCarried(ctx, runtime, assets);
-    if (runtime.event.kind === "strawActive") { const c = strawCenter(runtime, performance.now()); ctx.save(); ctx.lineCap = "round"; ctx.lineWidth = 22; ctx.strokeStyle = "#ff7b93"; ctx.beginPath(); ctx.moveTo(c.x - 70, CUP.topY - 115); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.lineWidth = 8; ctx.strokeStyle = "rgba(255,255,255,0.92)"; ctx.setLineDash([22, 20]); ctx.beginPath(); ctx.moveTo(c.x - 70, CUP.topY - 115); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.restore(); }
-  } else { ctx.font = "132px sans-serif"; ctx.textAlign = "center"; ctx.fillText("\u{1f9cb}", CUP.centerX, CUP_CENTER.y + 40); }
+    if (runtime.event.kind === "strawActive") {
+      const c = strawCenter(runtime, performance.now());
+      const strawImage = assetImage(assets, "scene-straw");
+      if (strawImage) drawAssetBetween(ctx, strawImage, { x: c.x - 70, y: CUP.topY - 115 }, c, 84, 88);
+      else { ctx.save(); ctx.lineCap = "round"; ctx.lineWidth = 22; ctx.strokeStyle = "#ff7b93"; ctx.beginPath(); ctx.moveTo(c.x - 70, CUP.topY - 115); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.lineWidth = 8; ctx.strokeStyle = "rgba(255,255,255,0.92)"; ctx.setLineDash([22, 20]); ctx.beginPath(); ctx.moveTo(c.x - 70, CUP.topY - 115); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.restore(); }
+    }
+  } else { const titleImage = assetImage(assets, "ui-title-badge"); if (titleImage) drawAssetCentered(ctx, titleImage, CUP.centerX, CUP_CENTER.y + 20, 210, 210, 0.9); else { ctx.font = "132px sans-serif"; ctx.textAlign = "center"; ctx.fillText("\u{1f9cb}", CUP.centerX, CUP_CENTER.y + 40); } }
   ctx.restore(); ctx.restore(); ctx.restore(); ctx.fillStyle = "rgba(77,39,20,0.18)"; ctx.fillRect(0, HEIGHT - 28, WIDTH, 28); if (status !== "playing") { ctx.fillStyle = "rgba(67,31,16,0.22)"; ctx.fillRect(0, 0, WIDTH, HEIGHT); }
 }
 function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (result: "won" | "lost", reason: string) => void) {
@@ -181,14 +239,19 @@ export function MilkTeaGame() {
   const stopPointer = () => { if (runtimeRef.current) runtimeRef.current.target.active = false; };
   const persistScore = () => { if (!finalStats || saved) return; const next = saveLeaderboard({ name: (playerName.trim() || TXT.defaultName).slice(0, 12), score: finalStats.score, elapsed: finalStats.elapsed, highestLevel: finalStats.highestLevel, result: finalStats.result, date: new Date().toLocaleString("zh-CN") }); setLeaderboard(next); setSaved(true); };
   const current = levelInfo(hud.level), next = hud.level < 10 ? levelInfo(hud.level + 1) : null, finalLevelName = finalStats ? levelInfo(finalStats.highestLevel).name : current.name;
+  const menuBadgeUrl = assetUrl("ui-title-badge");
+  const victoryBurstUrl = assetUrl("ui-victory-burst");
+  const strawUrl = assetUrl("scene-straw");
+  const currentAssetUrl = assetUrl(current.assetId);
+  const nextAssetUrl = next ? assetUrl(next.assetId) : null;
   return (
     <main className="game-shell">
       <section className="hero-panel" aria-label="game intro"><p className="eyebrow">Milk Tea Merge Survival</p><h1>{"\u6447\u6447\u5976\u8336\u5927\u5408\u6210"}</h1><p className="intro">{"\u4ece\u4e00\u9897\u897f\u7c73\u5f00\u59cb\uff0c\u5728\u66f4\u5927\u7684\u5012\u68af\u5f62\u5976\u8336\u676f\u91cc\u63a2\u7d22\u3002\u5403\u6389\u7684\u5c0f\u6599\u4f1a\u6302\u5728\u73a9\u5bb6\u8eab\u4e0a\uff0c\u5927\u529b\u5de6\u53f3\u6447\u65f6\u6574\u676f\u90fd\u4f1a\u7529\u8d77\u6765\u3002"}</p><div className="rules-card"><span>{"\u540c\u7ea7 x 3 = \u8fdb\u5316"}</span><span>{"\u5403\u8fc7\u7684\u5c0f\u6599\u4f1a\u663e\u793a\u5728\u8eab\u4e0a"}</span><span>{"\u66f4\u591a +1 / +2 \u9ad8\u7ea7\u6599\u4f1a\u5236\u9020\u538b\u8feb"}</span></div></section>
-      <section className="phone-frame" aria-label="game area"><div className="hud top-hud"><div><small>{"\u5f53\u524d"}</small><strong>{current.emoji} {current.name}</strong></div><div><small>{"\u8fdb\u5ea6"}</small><strong>{hud.progress}/3</strong></div><div><small>{"\u65f6\u95f4"}</small><strong>{formatTime(hud.elapsed)}</strong></div></div><canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="game-canvas" onPointerDown={handlePointer} onPointerMove={handlePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer} aria-label="game canvas" /><div className="hud bottom-hud"><span>{hud.message}</span><b>{hud.score} {"\u5206"}</b></div>
-        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{"\u{1f9cb}"}</div><h2>{"\u51c6\u5907\u5f00\u6447\uff01"}</h2><p>{"\u9f20\u6807\u3001\u89e6\u6478\u6216 WASD \u63a7\u5236\u5c0f\u6599\u79fb\u52a8\u3002\u5730\u56fe\u66f4\u5927\uff0c\u955c\u5934\u53ea\u663e\u793a\u6574\u676f\u7ea6\u4e09\u5206\u4e4b\u4e00\u3002"}</p><button onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={openLeaderboard}>{"\u67e5\u770b\u6392\u884c\u699c"}</button></div>}
-        {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" ? "\u{1f7e0}" : "\u{1f964}"}</div><h2>{status === "won" ? "\u8d85\u7ea7\u65e0\u654c\u597d\u559d\u5730\u80dc\u5229\uff01" : "\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h2><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row"><button onClick={persistScore} disabled={saved}>{saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9"}</button><button className="secondary" onClick={startGame}>{"\u518d\u6765\u4e00\u5c40"}</button></div><button className="ghost" onClick={openLeaderboard}>{"\u770b\u6392\u884c\u699c"}</button></div>}
-        {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u672c\u5730\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row"><button onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={() => setStatus("menu")}>{"\u8fd4\u56de\u9996\u9875"}</button></div></div>}
-      </section><aside className="side-panel" aria-label="evolution"><h2>{"\u5c0f\u6599\u8fdb\u5316\u8def\u7ebf"}</h2><p>{"\u7b49\u7ea7\u63d0\u5347\u4f1a\u653e\u5927\u73a9\u5bb6\u4e3b\u4f53\uff1b\u5403\u8fc7\u7684\u5c0f\u6599\u4f1a\u4f5c\u4e3a\u5c0f\u6599\u6302\u4ef6\u56f4\u5728\u8eab\u8fb9\u3002"}</p><div className="evolution-list">{LEVELS.map((item) => <div className={item.level === hud.level ? "active" : ""} key={item.level}><span style={{ fontSize: 14 + item.scale * 5 }}>{item.emoji}</span><b>{item.name}</b><small>x{item.scale.toFixed(2)}</small></div>)}</div><div className="next-card"><small>{"\u4e0b\u4e00\u76ee\u6807"}</small><strong>{next ? next.emoji + " " + next.name : "\u5df2\u7ecf\u662f\u4f20\u8bf4\u67ff\u5b50"}</strong></div></aside>
+      <section className="phone-frame" aria-label="game area"><div className="hud top-hud"><div><small>{"\u5f53\u524d"}</small><strong>{currentAssetUrl ? <img className="hud-icon" src={currentAssetUrl} alt="" /> : current.emoji} {current.name}</strong></div><div><small>{"\u8fdb\u5ea6"}</small><strong>{hud.progress}/3</strong></div><div><small>{"\u65f6\u95f4"}</small><strong>{formatTime(hud.elapsed)}</strong></div></div><canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="game-canvas" onPointerDown={handlePointer} onPointerMove={handlePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer} aria-label="game canvas" /><div className="hud bottom-hud"><span>{hud.message}</span><b>{hud.score} {"\u5206"}</b></div>
+        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u{1f9cb}"}</div><h2>{"\u51c6\u5907\u5f00\u6447\uff01"}</h2><p>{"\u9f20\u6807\u3001\u89e6\u6478\u6216 WASD \u63a7\u5236\u5c0f\u6599\u79fb\u52a8\u3002\u5730\u56fe\u66f4\u5927\uff0c\u955c\u5934\u53ea\u663e\u793a\u6574\u676f\u7ea6\u4e09\u5206\u4e4b\u4e00\u3002"}</p><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={openLeaderboard}>{"\u67e5\u770b\u6392\u884c\u699c"}</button></div>}
+        {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" && victoryBurstUrl ? <img src={victoryBurstUrl} alt="" /> : status === "lost" && strawUrl ? <img src={strawUrl} alt="" /> : status === "won" ? "\u{1f7e0}" : "\u{1f964}"}</div><h2>{status === "won" ? "\u8d85\u7ea7\u65e0\u654c\u597d\u559d\u5730\u80dc\u5229\uff01" : "\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h2><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row"><button onClick={persistScore} disabled={saved}>{saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9"}</button><button className="secondary" onClick={startGame}>{"\u518d\u6765\u4e00\u5c40"}</button></div><button className="ghost" onClick={openLeaderboard}>{"\u770b\u6392\u884c\u699c"}</button></div>}
+        {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u672c\u5730\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row"><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={() => setStatus("menu")}>{"\u8fd4\u56de\u9996\u9875"}</button></div></div>}
+      </section><aside className="side-panel" aria-label="evolution"><h2>{"\u5c0f\u6599\u8fdb\u5316\u8def\u7ebf"}</h2><p>{"\u7b49\u7ea7\u63d0\u5347\u4f1a\u653e\u5927\u73a9\u5bb6\u4e3b\u4f53\uff1b\u5403\u8fc7\u7684\u5c0f\u6599\u4f1a\u4f5c\u4e3a\u5c0f\u6599\u6302\u4ef6\u56f4\u5728\u8eab\u8fb9\u3002"}</p><div className="evolution-list">{LEVELS.map((item) => <div className={item.level === hud.level ? "active" : ""} key={item.level}><span className="evolution-icon" style={{ width: 30 + item.scale * 7, height: 30 + item.scale * 7 }}>{assetUrl(item.assetId) ? <img src={assetUrl(item.assetId) ?? undefined} alt="" /> : item.emoji}</span><b>{item.name}</b><small>x{item.scale.toFixed(2)}</small></div>)}</div><div className="next-card"><small>{"\u4e0b\u4e00\u76ee\u6807"}</small><strong>{next ? <>{nextAssetUrl ? <img className="next-icon" src={nextAssetUrl} alt="" /> : next.emoji} {next.name}</> : "\u5df2\u7ecf\u662f\u4f20\u8bf4\u67ff\u5b50"}</strong></div></aside>
     </main>
   );
 }

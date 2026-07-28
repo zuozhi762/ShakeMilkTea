@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 :root {
   --background: #fff4cf;
@@ -460,4 +460,66 @@ h2 {
     left: 18px;
     right: 18px;
   }
+}
+
+.logo-bubble img {
+  width: 86%;
+  height: 86%;
+  object-fit: contain;
+  display: block;
+}
+
+.hud strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.hud-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.asset-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.asset-button::before {
+  content: "";
+  position: absolute;
+  inset: 4px 10px auto;
+  height: 42%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.34);
+  pointer-events: none;
+}
+
+.evolution-icon {
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  flex: 0 0 auto;
+}
+
+.evolution-icon img,
+.next-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.next-card strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.next-icon {
+  width: 34px;
+  height: 34px;
 }

@@ -1,4 +1,4 @@
-﻿export type ImageAssetCategory = "topping" | "ui" | "scene" | "effect";
+export type ImageAssetCategory = "topping" | "ui" | "scene" | "effect";
 export type ImageAssetStatus = "planned" | "generated" | "approved";
 
 export type ImageAssetId =
@@ -72,7 +72,7 @@ const toppingAssets: ImageAssetDefinition[] = TOPPING_LEVELS.map((level) => ({
   category: "topping",
   name: level.name,
   usage: `游戏内等级 ${level.level} 小料主体、进化路线图标、玩家主体兜底图`,
-  fileName: `${level.assetId}.png`,
+  fileName: `${level.assetId}.svg`,
   status: "generated",
   promptSubject: `${level.name} milk tea topping, readable as a round mobile-game collectible at small size`,
   canvasRole: "ingredient",
