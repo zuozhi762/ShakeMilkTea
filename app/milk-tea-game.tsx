@@ -42,6 +42,9 @@ type Runtime = { running: boolean; startTime: number; lastTime: number; elapsed:
 type Hud = { level: number; progress: number; score: number; elapsed: number; message: string };
 type ScoreRecord = { name: string; score: number; elapsed: number; highestLevel: number; result: "won" | "lost"; date: string };
 type FinalStats = Omit<ScoreRecord, "name" | "date"> & { reason: string };
+type TouchStick = { pointerId: number; startX: number; startY: number } | null;
+
+let worldCache: { canvas: HTMLCanvasElement; assetCount: number } | null = null;
 
 const levelInfo = (level: number) => LEVELS[Math.max(0, Math.min(LEVELS.length - 1, level - 1))];
 const radiusForLevel = (level: number) => 9 * levelInfo(level).scale;
@@ -143,27 +146,34 @@ function drawWorldBackground(ctx: CanvasRenderingContext2D) {
   ctx.strokeStyle = "rgba(255,255,255,0.14)"; ctx.lineWidth = 3;
   for (let line = 0; line < 8; line += 1) { ctx.beginPath(); const y = 110 + line * 145; for (let x = -40; x <= WORLD_WIDTH + 40; x += 36) { const wy = y + Math.sin((x + line * 41) / 31) * 8; if (x === -40) ctx.moveTo(x, wy); else ctx.lineTo(x, wy); } ctx.stroke(); }
 }
-function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, status: Status, assets: AssetImageMap = {}) {
-  ctx.clearRect(0, 0, WIDTH, HEIGHT); const screenBg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT); screenBg.addColorStop(0, "#fff7da"); screenBg.addColorStop(1, "#a76538"); ctx.fillStyle = screenBg; ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  ctx.save(); if (runtime) { ctx.scale(VIEW_SCALE, VIEW_SCALE); ctx.translate(-runtime.camera.x, -runtime.camera.y); } else { ctx.translate((WIDTH - WORLD_WIDTH * 0.42) / 2, 35); ctx.scale(0.42, 0.42); }
-  ctx.save(); if (runtime) { ctx.translate(CUP_CENTER.x, CUP_CENTER.y); ctx.rotate(runtime.shakeAngle); ctx.translate(-CUP_CENTER.x, -CUP_CENTER.y); }
-  drawWorldBackground(ctx); drawCupPath(ctx, 12); ctx.fillStyle = "rgba(255,255,255,0.26)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.82)"; ctx.lineWidth = 7; ctx.stroke();
+function getWorldLayer(assets: AssetImageMap) {
+  const assetCount = Object.keys(assets).length;
+  if (worldCache?.assetCount === assetCount) return worldCache.canvas;
+  const canvas = document.createElement("canvas");
+  canvas.width = WORLD_WIDTH;
+  canvas.height = WORLD_HEIGHT;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return canvas;
+  drawWorldBackground(ctx);
+  drawCupPath(ctx, 12); ctx.fillStyle = "rgba(255,255,255,0.26)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.82)"; ctx.lineWidth = 7; ctx.stroke();
   const cupImage = assetImage(assets, "scene-milk-tea-cup");
   if (cupImage) drawAssetCentered(ctx, cupImage, CUP.centerX, CUP_CENTER.y, CUP.topW + 86, CUP.bottomY - CUP.topY + 110, 0.45);
   drawCupPath(ctx); const tea = ctx.createLinearGradient(0, CUP.topY, 0, CUP.bottomY); tea.addColorStop(0, "rgba(255,219,147,0.76)"); tea.addColorStop(0.48, "rgba(188,113,56,0.86)"); tea.addColorStop(1, "rgba(103,54,30,0.92)"); ctx.fillStyle = tea; ctx.fill();
   const teaSurface = assetImage(assets, "scene-tea-surface");
   if (teaSurface) {
-    ctx.save();
-    drawCupPath(ctx); ctx.clip();
+    ctx.save(); drawCupPath(ctx); ctx.clip();
     const pattern = ctx.createPattern(teaSurface, "repeat");
-    if (pattern) {
-      ctx.globalAlpha = 0.34;
-      ctx.translate(runtime ? runtime.elapsed / -90 : 0, runtime ? runtime.elapsed / 150 : 0);
-      ctx.fillStyle = pattern;
-      ctx.fillRect(-280, CUP.topY - 80, WORLD_WIDTH + 560, CUP.bottomY - CUP.topY + 180);
-    }
+    if (pattern) { ctx.globalAlpha = 0.34; ctx.fillStyle = pattern; ctx.fillRect(-280, CUP.topY - 80, WORLD_WIDTH + 560, CUP.bottomY - CUP.topY + 180); }
     ctx.restore();
   }
+  worldCache = { canvas, assetCount };
+  return canvas;
+}
+function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, status: Status, assets: AssetImageMap = {}) {
+  ctx.clearRect(0, 0, WIDTH, HEIGHT); const screenBg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT); screenBg.addColorStop(0, "#fff7da"); screenBg.addColorStop(1, "#a76538"); ctx.fillStyle = screenBg; ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.save(); if (runtime) { ctx.scale(VIEW_SCALE, VIEW_SCALE); ctx.translate(-runtime.camera.x, -runtime.camera.y); } else { ctx.translate((WIDTH - WORLD_WIDTH * 0.42) / 2, 35); ctx.scale(0.42, 0.42); }
+  ctx.save(); if (runtime) { ctx.translate(CUP_CENTER.x, CUP_CENTER.y); ctx.rotate(runtime.shakeAngle); ctx.translate(-CUP_CENTER.x, -CUP_CENTER.y); }
+  ctx.drawImage(getWorldLayer(assets), 0, 0);
   ctx.save(); drawCupPath(ctx); ctx.clip();
   if (runtime) {
     if (runtime.event.kind === "shakeWarning" || runtime.event.kind === "shaking") {
@@ -212,7 +222,7 @@ function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (resul
 }
 
 export function MilkTeaGame() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null); const joystickKnobRef = useRef<HTMLDivElement | null>(null); const runtimeRef = useRef<Runtime | null>(null); const assetImagesRef = useRef<AssetImageMap>({}); const [assetRevision, setAssetRevision] = useState(0); const [status, setStatus] = useState<Status>("menu"); const [hud, setHud] = useState<Hud>({ level: 1, progress: 1, score: 0, elapsed: 0, message: TXT.defaultHint }); const [finalStats, setFinalStats] = useState<FinalStats | null>(null); const [leaderboard, setLeaderboard] = useState<ScoreRecord[]>([]); const [playerName, setPlayerName] = useState(TXT.defaultName); const [saved, setSaved] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null); const touchStickRef = useRef<TouchStick>(null); const runtimeRef = useRef<Runtime | null>(null); const assetImagesRef = useRef<AssetImageMap>({}); const [assetRevision, setAssetRevision] = useState(0); const [status, setStatus] = useState<Status>("menu"); const [hud, setHud] = useState<Hud>({ level: 1, progress: 1, score: 0, elapsed: 0, message: TXT.defaultHint }); const [finalStats, setFinalStats] = useState<FinalStats | null>(null); const [leaderboard, setLeaderboard] = useState<ScoreRecord[]>([]); const [playerName, setPlayerName] = useState(TXT.defaultName); const [saved, setSaved] = useState(false);
   const updateTargetFromClient = (clientX: number, clientY: number) => { const canvas = canvasRef.current, runtime = runtimeRef.current; if (!canvas || !runtime || !runtime.running) return; const rect = canvas.getBoundingClientRect(); let x = ((clientX - rect.left) / rect.width) * WIDTH / VIEW_SCALE + runtime.camera.x; let y = ((clientY - rect.top) / rect.height) * HEIGHT / VIEW_SCALE + runtime.camera.y; if (Math.abs(runtime.shakeAngle) > 0.001) { const dx = x - CUP_CENTER.x, dy = y - CUP_CENTER.y, c = Math.cos(-runtime.shakeAngle), s = Math.sin(-runtime.shakeAngle); x = CUP_CENTER.x + dx * c - dy * s; y = CUP_CENTER.y + dx * s + dy * c; } runtime.target = { x, y, active: true }; };
   useEffect(() => {
     let disposed = false;
@@ -235,10 +245,34 @@ export function MilkTeaGame() {
   useEffect(() => { const canvas = canvasRef.current, ctx = canvas?.getContext("2d"); if (!ctx || !canvas) return; let frame = 0; const finish = (result: "won" | "lost", reason: string) => { const runtime = runtimeRef.current; if (!runtime || !runtime.running) return; runtime.running = false; setFinalStats({ result, reason, score: runtime.score, elapsed: runtime.elapsed, highestLevel: runtime.highestLevel }); setSaved(false); setStatus(result); }; const loop = (now: number) => { const runtime = runtimeRef.current; if (!runtime || !runtime.running) return; const dt = Math.min(0.033, Math.max(0.001, (now - runtime.lastTime) / 1000)); runtime.lastTime = now; updateRuntime(runtime, dt, now, finish); drawScene(ctx, runtime, "playing", assetImagesRef.current); if (now - runtime.lastHudAt > 180) { runtime.lastHudAt = now; setHud({ level: runtime.player.level, progress: runtime.player.progress, score: runtime.score, elapsed: runtime.elapsed, message: eventMessage(runtime.event) }); } frame = window.requestAnimationFrame(loop); }; if (status === "playing") frame = window.requestAnimationFrame(loop); else drawScene(ctx, runtimeRef.current, status, assetImagesRef.current); return () => window.cancelAnimationFrame(frame); }, [status, assetRevision]);
   const startGame = () => { const runtime = createRuntime(); runtimeRef.current = runtime; setFinalStats(null); setSaved(false); setHud({ level: 1, progress: 1, score: 0, elapsed: 0, message: TXT.defaultHint }); setStatus("playing"); };
   const openLeaderboard = () => { setLeaderboard(loadLeaderboard()); setStatus("leaderboard"); };
-  const handlePointer = (event: React.PointerEvent<HTMLCanvasElement>) => { if (event.pointerType === "touch") return; if (event.type === "pointerdown") event.currentTarget.setPointerCapture(event.pointerId); updateTargetFromClient(event.clientX, event.clientY); };
-  const stopPointer = () => { if (runtimeRef.current) runtimeRef.current.target.active = false; };
-  const updateJoystick = (event: React.PointerEvent<HTMLDivElement>) => { const runtime = runtimeRef.current; if (!runtime?.running) return; event.preventDefault(); if (event.type === "pointerdown") event.currentTarget.setPointerCapture(event.pointerId); const rect = event.currentTarget.getBoundingClientRect(), radius = rect.width * 0.32, dx = event.clientX - (rect.left + rect.width / 2), dy = event.clientY - (rect.top + rect.height / 2), distance = Math.hypot(dx, dy), scale = distance > radius ? radius / distance : 1, x = dx * scale, y = dy * scale; runtime.target.active = false; runtime.joystick = { x: x / radius, y: y / radius, active: true }; if (joystickKnobRef.current) joystickKnobRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`; };
-  const stopJoystick = () => { const runtime = runtimeRef.current; if (runtime) runtime.joystick = { x: 0, y: 0, active: false }; if (joystickKnobRef.current) joystickKnobRef.current.style.transform = "translate3d(0, 0, 0)"; };
+  const handlePointer = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const runtime = runtimeRef.current;
+    if (!runtime?.running) return;
+    if (event.pointerType !== "touch") {
+      if (event.type === "pointerdown") event.currentTarget.setPointerCapture(event.pointerId);
+      updateTargetFromClient(event.clientX, event.clientY);
+      return;
+    }
+    event.preventDefault();
+    if (event.type === "pointerdown") {
+      event.currentTarget.setPointerCapture(event.pointerId);
+      touchStickRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY };
+    }
+    const stick = touchStickRef.current;
+    if (!stick || stick.pointerId !== event.pointerId) return;
+    const maxTravel = 58, deadZone = 5, dx = event.clientX - stick.startX, dy = event.clientY - stick.startY, distance = Math.hypot(dx, dy);
+    runtime.target.active = false;
+    runtime.joystick = distance <= deadZone ? { x: 0, y: 0, active: true } : { x: dx / Math.max(maxTravel, distance), y: dy / Math.max(maxTravel, distance), active: true };
+  };
+  const stopPointer = (event?: React.PointerEvent<HTMLCanvasElement>) => {
+    const runtime = runtimeRef.current;
+    if (!runtime) return;
+    if (event?.pointerType === "touch") {
+      if (touchStickRef.current?.pointerId !== event.pointerId) return;
+      touchStickRef.current = null;
+      runtime.joystick = { x: 0, y: 0, active: false };
+    } else runtime.target.active = false;
+  };
   const persistScore = () => { if (!finalStats || saved) return; const next = saveLeaderboard({ name: (playerName.trim() || TXT.defaultName).slice(0, 12), score: finalStats.score, elapsed: finalStats.elapsed, highestLevel: finalStats.highestLevel, result: finalStats.result, date: new Date().toLocaleString("zh-CN") }); setLeaderboard(next); setSaved(true); };
   const current = levelInfo(hud.level), finalLevelName = finalStats ? levelInfo(finalStats.highestLevel).name : current.name;
   const menuBadgeUrl = assetUrl("ui-title-badge");
@@ -248,8 +282,7 @@ export function MilkTeaGame() {
   return (
     <main className="game-shell">
       <section className="phone-frame" aria-label="game area"><div className="hud top-hud"><div><small>{"\u5f53\u524d"}</small><strong>{currentAssetUrl ? <img className="hud-icon" src={currentAssetUrl} alt="" /> : current.emoji} {current.name}</strong></div><div><small>{"\u8fdb\u5ea6"}</small><strong>{hud.progress}/3</strong></div><div><small>{"\u65f6\u95f4"}</small><strong>{formatTime(hud.elapsed)}</strong></div></div><canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="game-canvas" onPointerDown={handlePointer} onPointerMove={handlePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer} aria-label="game canvas" /><div className="hud bottom-hud"><span>{hud.message}</span><b>{hud.score} {"\u5206"}</b></div>
-        {status === "playing" && <div className="mobile-joystick" role="group" aria-label="移动摇杆" onPointerDown={updateJoystick} onPointerMove={updateJoystick} onPointerUp={stopJoystick} onPointerCancel={stopJoystick}><div ref={joystickKnobRef} className="joystick-knob" /></div>}
-        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u{1f9cb}"}</div><h2>{"\u51c6\u5907\u5f00\u6447\uff01"}</h2><p>{"\u7535\u8111\u7aef\u7528\u9f20\u6807\u6216 WASD\uff1b\u624b\u673a\u7aef\u7528\u5de6\u4e0b\u89d2\u865a\u62df\u6447\u6746\u63a7\u5236\u79fb\u52a8\u3002\u955c\u5934\u53ea\u663e\u793a\u6574\u676f\u7ea6\u4e09\u5206\u4e4b\u4e00\u3002"}</p><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={openLeaderboard}>{"\u67e5\u770b\u6392\u884c\u699c"}</button></div>}
+        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u{1f9cb}"}</div><h2>{"\u51c6\u5907\u5f00\u6447\uff01"}</h2><p>{"\u7535\u8111\u7aef\u7528\u9f20\u6807\u6216 WASD\uff1b\u624b\u673a\u7aef\u5728\u4efb\u610f\u4f4d\u7f6e\u6309\u4f4f\u540e\u6ed1\u52a8\uff0c\u5c31\u80fd\u50cf\u4f7f\u7528\u9690\u5f62\u6447\u6746\u4e00\u6837\u63a7\u5236\u79fb\u52a8\u3002\u955c\u5934\u53ea\u663e\u793a\u6574\u676f\u7ea6\u4e09\u5206\u4e4b\u4e00\u3002"}</p><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={openLeaderboard}>{"\u67e5\u770b\u6392\u884c\u699c"}</button></div>}
         {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" && victoryBurstUrl ? <img src={victoryBurstUrl} alt="" /> : status === "lost" && strawUrl ? <img src={strawUrl} alt="" /> : status === "won" ? "\u{1f7e0}" : "\u{1f964}"}</div><h2>{status === "won" ? "\u8d85\u7ea7\u65e0\u654c\u597d\u559d\u5730\u80dc\u5229\uff01" : "\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h2><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row"><button onClick={persistScore} disabled={saved}>{saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9"}</button><button className="secondary" onClick={startGame}>{"\u518d\u6765\u4e00\u5c40"}</button></div><button className="ghost" onClick={openLeaderboard}>{"\u770b\u6392\u884c\u699c"}</button></div>}
         {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u672c\u5730\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row"><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={() => setStatus("menu")}>{"\u8fd4\u56de\u9996\u9875"}</button></div></div>}
       </section>
