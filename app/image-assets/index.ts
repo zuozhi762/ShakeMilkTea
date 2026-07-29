@@ -72,9 +72,9 @@ const toppingAssets: ImageAssetDefinition[] = TOPPING_LEVELS.map((level) => ({
   category: "topping",
   name: level.name,
   usage: `游戏内等级 ${level.level} 小料主体、进化路线图标、玩家主体兜底图`,
-  fileName: `${level.assetId}.svg`,
+  fileName: `${level.assetId}.png`,
   status: "generated",
-  promptSubject: `${level.name} milk tea topping, readable as a round mobile-game collectible at small size`,
+  promptSubject: `${level.name} milk tea topping, readable as a shaped mobile-game collectible at small size, no circular badge backing`,
   canvasRole: "ingredient",
 }));
 
@@ -205,4 +205,3 @@ export function buildPromptBatch() {
     prompt: buildImagePrompt(asset),
   }));
 }
-

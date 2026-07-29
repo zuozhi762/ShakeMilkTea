@@ -121,17 +121,20 @@ function drawAssetBetween(ctx: CanvasRenderingContext2D, image: HTMLImageElement
 }
 function drawIngredient(ctx: CanvasRenderingContext2D, item: { x: number; y: number; radius: number; level: number }, isPlayer = false, assets: AssetImageMap = {}) {
   const lv = levelInfo(item.level); ctx.save(); ctx.translate(item.x, item.y);
-  ctx.fillStyle = isPlayer ? "rgba(255, 244, 166, 0.58)" : "rgba(255, 255, 255, 0.18)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + (isPlayer ? 9 : 3), 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = isPlayer ? "rgba(255, 255, 255, 0.92)" : "rgba(255, 255, 255, 0.68)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + 2, 0, Math.PI * 2); ctx.fill();
   const image = assetImage(assets, lv.assetId);
   if (image) {
-    const size = item.radius * 2.65;
+    const size = item.radius * 3.08;
+    if (isPlayer) {
+      ctx.shadowColor = "rgba(255, 243, 159, 0.95)";
+      ctx.shadowBlur = item.radius * 1.2;
+    }
     ctx.drawImage(image, -size / 2, -size / 2, size, size);
   } else {
+    ctx.fillStyle = isPlayer ? "rgba(255, 244, 166, 0.58)" : "rgba(255, 255, 255, 0.18)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + (isPlayer ? 9 : 3), 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = isPlayer ? "rgba(255, 255, 255, 0.92)" : "rgba(255, 255, 255, 0.68)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + 2, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = lv.color; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI * 2); ctx.fill();
     ctx.font = Math.round(item.radius * 1.55) + "px Apple Color Emoji, Segoe UI Emoji, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(lv.emoji, 0, 1);
   }
-  if (isPlayer) { ctx.strokeStyle = "rgba(126, 60, 16, 0.9)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, item.radius + 5, 0, Math.PI * 2); ctx.stroke(); }
   ctx.restore();
 }
 function drawPlayerWithCarried(ctx: CanvasRenderingContext2D, runtime: Runtime, assets: AssetImageMap) {
