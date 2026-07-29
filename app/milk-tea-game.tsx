@@ -13,6 +13,9 @@ const CUP_CENTER = { x: CUP.centerX, y: (CUP.topY + CUP.bottomY) / 2 };
 const LEADERBOARD_KEY = "shake_milk_tea_leaderboard";
 const EDGE_TOUCH_RATIO = 0.35;
 const PLAYER_SPEED_MULTIPLIER = 2;
+const TOUCH_STICK_TRAVEL = 82;
+const TOUCH_STICK_DEAD_ZONE = 7;
+const STRAW_FIRST_AT = 14000;
 const TXT = {
   defaultName: "\u533f\u540d\u5c0f\u6599",
   defaultHint: "\u6309\u4f4f\u6ed1\u52a8\u63a7\u5236\u65b9\u5411\uff0c\u8ffd\u7740\u5c0f\u6599\u63a2\u7d22\u3002",
@@ -76,7 +79,7 @@ function updateCamera(runtime: Runtime) { const viewW = WIDTH / VIEW_SCALE, view
 function createRuntime(): Runtime {
   const now = performance.now();
   const player: Player = { x: CUP.centerX, y: CUP.bottomY - 160, vx: 0, vy: 0, level: 1, progress: 1, radius: radiusForLevel(1), carried: Array(LEVELS.length + 1).fill(0) };
-  const runtime: Runtime = { running: true, startTime: now, lastTime: now, elapsed: 0, score: 0, highestLevel: 1, nextId: 1, nextShakeAt: 8000, nextStrawAt: 18000, lastSpawnAt: 0, lastHudAt: 0, player, toppings: [], target: { x: player.x, y: player.y, active: false }, joystick: { x: 0, y: 0, active: false }, keys: new Set(), event: { kind: "idle", until: 0, started: now }, camera: { x: 0, y: 0 }, shakeAngle: 0, shakePower: 0 };
+  const runtime: Runtime = { running: true, startTime: now, lastTime: now, elapsed: 0, score: 0, highestLevel: 1, nextId: 1, nextShakeAt: 8000, nextStrawAt: STRAW_FIRST_AT, lastSpawnAt: 0, lastHudAt: 0, player, toppings: [], target: { x: player.x, y: player.y, active: false }, joystick: { x: 0, y: 0, active: false }, keys: new Set(), event: { kind: "idle", until: 0, started: now }, camera: { x: 0, y: 0 }, shakeAngle: 0, shakePower: 0 };
   updateCamera(runtime); addToppings(runtime, 10, 1); addToppings(runtime, 4, 2); addToppings(runtime, 2, 3); return runtime;
 }
 function addToppings(runtime: Runtime, count: number, forcedLevel?: number) { for (let i = 0; i < count; i += 1) { const level = forcedLevel ?? chooseSpawnLevel(runtime.player.level, runtime.elapsed), radius = radiusForLevel(level); let point = randomCupPoint(radius); for (let attempts = 0; attempts < 50; attempts += 1) { point = randomCupPoint(radius); if (dist(point, runtime.player) > runtime.player.radius + radius + 55) break; } runtime.toppings.push({ id: runtime.nextId, x: point.x, y: point.y, vx: rand(-52, 52), vy: rand(-52, 52), level, radius, spin: rand(0, Math.PI * 2) }); runtime.nextId += 1; } }
@@ -102,7 +105,10 @@ function normalizePlayerInventory(player: Player) {
 }
 function eventMessage(event: ActiveEvent) { if (event.kind === "shakeWarning") return TXT.shakeWarn; if (event.kind === "shaking") return TXT.shaking; if (event.kind === "strawWarning") return TXT.strawWarn; if (event.kind === "strawActive") return TXT.strawActive; return TXT.defaultHint; }
 function triggerShake(runtime: Runtime, now: number) { runtime.event = { kind: "shakeWarning", until: now + 800, started: now, swing: Math.random() > 0.5 ? 1 : -1 }; }
-function strawDifficulty(runtime: Runtime) { return Math.min(1, runtime.elapsed / 155000 + Math.max(0, runtime.player.level - 1) / 18); }
+function strawDifficulty(runtime: Runtime) { return clamp(runtime.elapsed / 150000 + Math.max(0, runtime.player.level - 1) / 20, 0, 1); }
+function strawWarningMs(runtime: Runtime) { return 1180 - strawDifficulty(runtime) * 520; }
+function strawJabMs(runtime: Runtime) { return 1280 - strawDifficulty(runtime) * 650; }
+function nextStrawDelay(runtime: Runtime) { return rand(17500 - strawDifficulty(runtime) * 6200, 25500 - strawDifficulty(runtime) * 8500); }
 function makeStrawStabs(runtime: Runtime): StrawStab[] {
   const d = strawDifficulty(runtime);
   return [0, 1, 2].map((index) => {
@@ -114,7 +120,7 @@ function makeStrawStabs(runtime: Runtime): StrawStab[] {
     return { x, y, fromX: clamp(x - side * (190 - d * 36), CUP.centerX - CUP.topW / 2 - 120, CUP.centerX + CUP.topW / 2 + 120), fromY: CUP.topY - 185 - index * 12 };
   });
 }
-function triggerStraw(runtime: Runtime, now: number) { const d = strawDifficulty(runtime), stabs = makeStrawStabs(runtime); runtime.event = { kind: "strawWarning", until: now + 1050 - d * 360, started: now, stabs, jabMs: 1120 - d * 480 }; }
+function triggerStraw(runtime: Runtime, now: number) { const stabs = makeStrawStabs(runtime); runtime.event = { kind: "strawWarning", until: now + strawWarningMs(runtime), started: now, stabs, jabMs: strawJabMs(runtime) }; }
 function currentStrawStab(runtime: Runtime, now: number) {
   const stabs = runtime.event.stabs ?? [];
   if (stabs.length === 0) return null;
@@ -240,9 +246,12 @@ function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (resul
   else if (runtime.event.kind === "shakeWarning" && now >= runtime.event.until) { runtime.event = { ...runtime.event, kind: "shaking", until: now + 1850, started: now }; runtime.shakePower = 1; }
   else if (runtime.event.kind === "shaking" && now >= runtime.event.until) { runtime.score += 100; runtime.event = { kind: "idle", until: 0, started: now }; runtime.nextShakeAt = runtime.elapsed + rand(11000 - difficulty * 3500, 19000 - difficulty * 4500); }
   else if (runtime.event.kind === "strawWarning" && now >= runtime.event.until) { const jabMs = runtime.event.jabMs ?? 960; runtime.event = { ...runtime.event, kind: "strawActive", until: now + jabMs * 3, started: now }; }
-  else if (runtime.event.kind === "strawActive" && now >= runtime.event.until) { runtime.score += 260; runtime.event = { kind: "idle", until: 0, started: now }; runtime.nextStrawAt = runtime.elapsed + rand(14500 - difficulty * 4800, 24500 - difficulty * 6500); }
+  else if (runtime.event.kind === "strawActive" && now >= runtime.event.until) { runtime.score += 260; runtime.event = { kind: "idle", until: 0, started: now }; runtime.nextStrawAt = runtime.elapsed + nextStrawDelay(runtime); }
   const keyX = (runtime.keys.has("arrowright") || runtime.keys.has("d") ? 1 : 0) - (runtime.keys.has("arrowleft") || runtime.keys.has("a") ? 1 : 0); const keyY = (runtime.keys.has("arrowdown") || runtime.keys.has("s") ? 1 : 0) - (runtime.keys.has("arrowup") || runtime.keys.has("w") ? 1 : 0); let dirX = runtime.joystick.active ? runtime.joystick.x : keyX, dirY = runtime.joystick.active ? runtime.joystick.y : keyY;
-  if (dirX === 0 && dirY === 0 && runtime.target.active) { const dx = runtime.target.x - player.x, dy = runtime.target.y - player.y, len = Math.hypot(dx, dy); if (len > 5) { dirX = dx / len; dirY = dy / len; } } else if (dirX || dirY) { const len = Math.hypot(dirX, dirY); dirX /= len; dirY /= len; }
+  if (runtime.joystick.active) {
+    const power = clamp(Math.hypot(dirX, dirY), 0, 1);
+    if (power > 0) { dirX /= power; dirY /= power; dirX *= power; dirY *= power; }
+  } else if (dirX === 0 && dirY === 0 && runtime.target.active) { const dx = runtime.target.x - player.x, dy = runtime.target.y - player.y, len = Math.hypot(dx, dy); if (len > 5) { dirX = dx / len; dirY = dy / len; } } else if (dirX || dirY) { const len = Math.hypot(dirX, dirY); dirX /= len; dirY /= len; }
   const speedPenalty = (levelInfo(player.level).scale - 1) * 14, accel = 840 * PLAYER_SPEED_MULTIPLIER, maxSpeed = (205 - speedPenalty) * PLAYER_SPEED_MULTIPLIER; player.vx += dirX * accel * dt; player.vy += dirY * accel * dt; const pSpeed = Math.hypot(player.vx, player.vy); if (pSpeed > maxSpeed) { player.vx = player.vx / pSpeed * maxSpeed; player.vy = player.vy / pSpeed * maxSpeed; }
   if (runtime.event.kind === "shaking") { const elapsed = now - runtime.event.started, direction = runtime.event.swing ?? 1, pulse = Math.sin(elapsed / 48), swing = direction * pulse; runtime.shakeAngle = swing * 0.18; runtime.shakePower = Math.max(0, 1 - elapsed / 2050); const shakeStrength = 560 + difficulty * 260, lateral = Math.cos(elapsed / 48) * direction; for (const item of [player, ...runtime.toppings]) { const dx = item.x - CUP_CENTER.x, dy = item.y - CUP_CENTER.y, len = Math.max(80, Math.hypot(dx, dy)); const tangentX = -dy / len, tangentY = dx / len, bottomBias = 0.65 + cupT(item.y) * 0.9; item.vx += (tangentX * shakeStrength * swing + lateral * shakeStrength * 0.95) * bottomBias * dt; item.vy += (tangentY * shakeStrength * swing + Math.sin(elapsed / 35) * 170) * bottomBias * dt; } } else { runtime.shakeAngle *= 0.82; runtime.shakePower *= 0.84; }
   if (runtime.event.kind === "strawActive") {
@@ -300,17 +309,18 @@ export function MilkTeaGame() {
     }
     const stick = touchStickRef.current;
     if (!stick || stick.pointerId !== event.pointerId) return;
-    const maxTravel = 72, deadZone = 6, dx = event.clientX - stick.anchorX, dy = event.clientY - stick.anchorY, distance = Math.hypot(dx, dy);
+    const dx = event.clientX - stick.anchorX, dy = event.clientY - stick.anchorY, distance = Math.hypot(dx, dy);
     runtime.target.active = false;
-    if (distance > maxTravel) {
-      const keepX = dx / distance * maxTravel;
-      const keepY = dy / distance * maxTravel;
+    if (distance > TOUCH_STICK_TRAVEL) {
+      const keepX = dx / distance * TOUCH_STICK_TRAVEL;
+      const keepY = dy / distance * TOUCH_STICK_TRAVEL;
       stick.anchorX = event.clientX - keepX;
       stick.anchorY = event.clientY - keepY;
     }
     stick.lastX = event.clientX;
     stick.lastY = event.clientY;
-    runtime.joystick = distance <= deadZone ? { x: 0, y: 0, active: true } : { x: dx / distance, y: dy / distance, active: true };
+    const power = clamp((distance - TOUCH_STICK_DEAD_ZONE) / (TOUCH_STICK_TRAVEL - TOUCH_STICK_DEAD_ZONE), 0, 1);
+    runtime.joystick = power <= 0 ? { x: 0, y: 0, active: true } : { x: dx / distance * power, y: dy / distance * power, active: true };
   };
   const stopPointer = (event?: React.PointerEvent<HTMLCanvasElement>) => {
     const runtime = runtimeRef.current;
