@@ -44,7 +44,7 @@ type ScoreRecord = { name: string; score: number; elapsed: number; highestLevel:
 type FinalStats = Omit<ScoreRecord, "name" | "date"> & { reason: string };
 
 const levelInfo = (level: number) => LEVELS[Math.max(0, Math.min(LEVELS.length - 1, level - 1))];
-const radiusForLevel = (level: number) => 9 * levelInfo(level).scale;
+const radiusForLevel = (level: number) => 8.6 * levelInfo(level).scale;
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -61,18 +61,27 @@ function clampPointToCup(x: number, y: number, radius: number) { const edgeRadiu
 function randomCupPoint(radius: number) { const y = rand(CUP.topY + radius + 18, CUP.bottomY - radius - 18); const b = cupBoundsAt(y, radius + 14); return { x: rand(b.left, b.right), y }; }
 function difficultyStage(elapsed: number, playerLevel: number) { return Math.min(5, Math.max(Math.floor(elapsed / 30000), Math.floor((playerLevel - 1) / 2))); }
 function chooseSpawnLevel(playerLevel: number, elapsed = 0) {
-  const maxLevel = Math.min(9, playerLevel + 2); const stage = difficultyStage(elapsed, playerLevel), highBoost = stage > 0 ? 2 : 1, lowCut = stage > 0 ? 0.5 : 1;
-  const weights = Array.from({ length: maxLevel }, (_, i) => { const level = i + 1; if (level === playerLevel + 2) return (0.7 + stage * 0.7) * highBoost; if (level === playerLevel + 1) return (1.2 + stage * 0.8) * highBoost; if (level === playerLevel) return Math.max(3.0, 4.2 - stage * 0.25); return Math.max(0.45, (2.9 - (playerLevel - level) * 0.35) * lowCut); });
+  const stage = difficultyStage(elapsed, playerLevel), maxLevel = Math.min(9, playerLevel + 2), minLevel = Math.max(1, Math.min(playerLevel - 3, stage));
+  const levels = Array.from({ length: maxLevel - minLevel + 1 }, (_, i) => minLevel + i);
+  const pressure = clamp((playerLevel - 1) / 9 + elapsed / 180000, 0, 1.35);
+  const weights = levels.map((level) => {
+    const delta = level - playerLevel;
+    if (delta <= -4) return 0.03;
+    if (delta < 0) return Math.max(0.08, 1.35 - pressure * 1.55 + delta * 0.2);
+    if (delta === 0) return 2.0 + pressure * 0.4;
+    if (delta === 1) return 1.15 + pressure * 2.2;
+    return 0.42 + pressure * 1.7;
+  });
   const total = weights.reduce((s, n) => s + n, 0); let roll = Math.random() * total;
-  for (let i = 0; i < weights.length; i += 1) { roll -= weights[i]; if (roll <= 0) return i + 1; }
-  return maxLevel;
+  for (let i = 0; i < weights.length; i += 1) { roll -= weights[i]; if (roll <= 0) return levels[i]; }
+  return levels[levels.length - 1];
 }
 function updateCamera(runtime: Runtime) { const viewW = WIDTH / VIEW_SCALE, viewH = HEIGHT / VIEW_SCALE; runtime.camera.x += (clamp(runtime.player.x - viewW / 2, 0, WORLD_WIDTH - viewW) - runtime.camera.x) * 0.18; runtime.camera.y += (clamp(runtime.player.y - viewH / 2, 0, WORLD_HEIGHT - viewH) - runtime.camera.y) * 0.18; }
 function createRuntime(): Runtime {
   const now = performance.now();
   const player: Player = { x: CUP.centerX, y: CUP.bottomY - 160, vx: 0, vy: 0, level: 1, progress: 1, radius: radiusForLevel(1), carried: Array(LEVELS.length + 1).fill(0) };
   const runtime: Runtime = { running: true, startTime: now, lastTime: now, elapsed: 0, score: 0, highestLevel: 1, nextId: 1, nextShakeAt: 8000, lastSpawnAt: 0, lastHudAt: 0, player, toppings: [], target: { x: player.x, y: player.y, active: false }, joystick: { x: 0, y: 0, power: 0, active: false }, keys: new Set(), event: { kind: "idle", until: 0, started: now }, camera: { x: 0, y: 0 }, shakeAngle: 0, shakePower: 0 };
-  updateCamera(runtime); addToppings(runtime, 10, 1); addToppings(runtime, 4, 2); addToppings(runtime, 2, 3); return runtime;
+  updateCamera(runtime); addToppings(runtime, 7, 1); addToppings(runtime, 2, 2); return runtime;
 }
 function addToppings(runtime: Runtime, count: number, forcedLevel?: number) { for (let i = 0; i < count; i += 1) { const level = forcedLevel ?? chooseSpawnLevel(runtime.player.level, runtime.elapsed), radius = radiusForLevel(level); let point = randomCupPoint(radius); for (let attempts = 0; attempts < 50; attempts += 1) { point = randomCupPoint(radius); if (dist(point, runtime.player) > runtime.player.radius + radius + 55) break; } runtime.toppings.push({ id: runtime.nextId, x: point.x, y: point.y, vx: rand(-52, 52), vy: rand(-52, 52), level, radius, spin: rand(0, Math.PI * 2) }); runtime.nextId += 1; } }
 function normalizePlayerInventory(player: Player) {
@@ -121,17 +130,20 @@ function drawAssetBetween(ctx: CanvasRenderingContext2D, image: HTMLImageElement
 }
 function drawIngredient(ctx: CanvasRenderingContext2D, item: { x: number; y: number; radius: number; level: number }, isPlayer = false, assets: AssetImageMap = {}) {
   const lv = levelInfo(item.level); ctx.save(); ctx.translate(item.x, item.y);
-  ctx.fillStyle = isPlayer ? "rgba(255, 244, 166, 0.58)" : "rgba(255, 255, 255, 0.18)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + (isPlayer ? 9 : 3), 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = isPlayer ? "rgba(255, 255, 255, 0.92)" : "rgba(255, 255, 255, 0.68)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + 2, 0, Math.PI * 2); ctx.fill();
+  if (isPlayer) {
+    ctx.fillStyle = "rgba(255, 244, 166, 0.34)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + 8, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(126, 60, 16, 0.72)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, item.radius + 5, 0, Math.PI * 2); ctx.stroke();
+  }
   const image = assetImage(assets, lv.assetId);
   if (image) {
-    const size = item.radius * 2.65;
+    const size = item.radius * 2.9;
     ctx.drawImage(image, -size / 2, -size / 2, size, size);
   } else {
-    ctx.fillStyle = lv.color; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI * 2); ctx.fill();
-    ctx.font = Math.round(item.radius * 1.55) + "px Apple Color Emoji, Segoe UI Emoji, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(lv.emoji, 0, 1);
+    const points = Math.max(5, Math.min(8, item.level + 4));
+    ctx.fillStyle = lv.color; ctx.beginPath();
+    for (let i = 0; i < points; i += 1) { const angle = -Math.PI / 2 + i / points * Math.PI * 2, r = item.radius * (i % 2 ? 0.82 : 1); const x = Math.cos(angle) * r, y = Math.sin(angle) * r; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+    ctx.closePath(); ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.72)"; ctx.lineWidth = Math.max(1.5, item.radius * 0.12); ctx.stroke();
   }
-  if (isPlayer) { ctx.strokeStyle = "rgba(126, 60, 16, 0.9)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, item.radius + 5, 0, Math.PI * 2); ctx.stroke(); }
   ctx.restore();
 }
 function drawPlayerWithCarried(ctx: CanvasRenderingContext2D, runtime: Runtime, assets: AssetImageMap) {
@@ -204,14 +216,14 @@ function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (resul
   else if (runtime.event.kind === "strawActive" && now >= runtime.event.until) { runtime.score += 200; runtime.event = { kind: "idle", until: 0, started: now }; }
   const keyX = (runtime.keys.has("arrowright") || runtime.keys.has("d") ? 1 : 0) - (runtime.keys.has("arrowleft") || runtime.keys.has("a") ? 1 : 0); const keyY = (runtime.keys.has("arrowdown") || runtime.keys.has("s") ? 1 : 0) - (runtime.keys.has("arrowup") || runtime.keys.has("w") ? 1 : 0); let dirX = keyX, dirY = keyY, inputPower = (keyX || keyY) ? 1 : 0;
   if (runtime.joystick.active && inputPower === 0) { dirX = runtime.joystick.x; dirY = runtime.joystick.y; inputPower = runtime.joystick.power; }
-  if (dirX === 0 && dirY === 0 && runtime.target.active) { const dx = runtime.target.x - player.x, dy = runtime.target.y - player.y, len = Math.hypot(dx, dy); if (len > 4) { dirX = dx / len; dirY = dy / len; inputPower = clamp(len / 42, 0, 1); } else { runtime.target.active = false; } } else if (dirX || dirY) { const len = Math.hypot(dirX, dirY); dirX /= len; dirY /= len; }
-  const speedPenalty = (levelInfo(player.level).scale - 1) * 15, maxSpeed = 360 - speedPenalty; player.vx = dirX * maxSpeed * inputPower; player.vy = dirY * maxSpeed * inputPower;
+  if (dirX === 0 && dirY === 0 && runtime.target.active) { const dx = runtime.target.x - player.x, dy = runtime.target.y - player.y, len = Math.hypot(dx, dy); if (len > 4) { dirX = dx / len; dirY = dy / len; inputPower = clamp(len / 88, 0.12, 1); } else { runtime.target.active = false; } } else if (dirX || dirY) { const len = Math.hypot(dirX, dirY); dirX /= len; dirY /= len; }
+  const speedPenalty = (levelInfo(player.level).scale - 1) * 10, maxSpeed = 235 - speedPenalty; player.vx = dirX * maxSpeed * inputPower; player.vy = dirY * maxSpeed * inputPower;
   if (runtime.event.kind === "shaking") { const elapsed = now - runtime.event.started, direction = runtime.event.swing ?? 1, pulse = Math.sin(elapsed / 48), swing = direction * pulse; runtime.shakeAngle = swing * 0.18; runtime.shakePower = Math.max(0, 1 - elapsed / 2050); const shakeStrength = 560 + difficulty * 260, lateral = Math.cos(elapsed / 48) * direction; for (const item of [player, ...runtime.toppings]) { const dx = item.x - CUP_CENTER.x, dy = item.y - CUP_CENTER.y, len = Math.max(80, Math.hypot(dx, dy)); const tangentX = -dy / len, tangentY = dx / len, bottomBias = 0.65 + cupT(item.y) * 0.9; item.vx += (tangentX * shakeStrength * swing + lateral * shakeStrength * 0.95) * bottomBias * dt; item.vy += (tangentY * shakeStrength * swing + Math.sin(elapsed / 35) * 170) * bottomBias * dt; } } else { runtime.shakeAngle *= 0.82; runtime.shakePower *= 0.84; }
   if (runtime.event.kind === "strawActive") { const tip = strawTip(runtime, now), c = tip.target, dangerRadius = 43 + difficulty * 17 + stage * 4, pullRadius = 210 + difficulty * 54 + stage * 14, pull = 260 + difficulty * 185 + stage * 48, dPlayer = dist(player, tip); if (tip.active && dPlayer < dangerRadius + player.radius * 0.55) { finish("lost", "\u4f60\u88ab\u5438\u7ba1\u6233\u5230\u4e86"); return; } runtime.toppings = runtime.toppings.filter((item) => { const d = dist(item, tip); if (tip.active && d < dangerRadius + item.radius * 0.3) return false; if (d < pullRadius) { const power = (1 - d / pullRadius) * pull * 0.95; item.vx += (c.x - item.x) / Math.max(1, d) * power * dt; item.vy += (c.y - item.y) / Math.max(1, d) * power * dt; } return true; }); }
   player.x += player.vx * dt; player.y += player.vy * dt; keepInCup(player);
   for (const item of runtime.toppings) { const wander = 16 + item.level * 2.4; item.vx += Math.cos(now / 620 + item.spin) * wander * dt; item.vy += Math.sin(now / 760 + item.spin) * wander * dt; const maxItemSpeed = runtime.event.kind === "shaking" ? 360 + difficulty * 120 : 58 + item.level * 5 + difficulty * 24, speed = Math.hypot(item.vx, item.vy); if (speed > maxItemSpeed) { item.vx = item.vx / speed * maxItemSpeed; item.vy = item.vy / speed * maxItemSpeed; } item.x += item.vx * dt; item.y += item.vy * dt; keepInCup(item); }
   for (let i = runtime.toppings.length - 1; i >= 0; i -= 1) { const item = runtime.toppings[i]; if (!isInsideCup(item.x, item.y, item.radius)) continue; if (dist(player, item) < player.radius + item.radius * 0.72) { if (item.level > player.level) { finish("lost", "\u649e\u4e0a\u4e86\u66f4\u5927\u7684" + levelInfo(item.level).name); return; } runtime.toppings.splice(i, 1); const oldLevel = player.level; player.carried[item.level] = (player.carried[item.level] ?? 0) + 1; runtime.score += item.level === oldLevel ? item.level * 20 : item.level * 10; normalizePlayerInventory(player); if (player.level > oldLevel) { for (let level = oldLevel + 1; level <= player.level; level += 1) runtime.score += level * 100; runtime.highestLevel = Math.max(runtime.highestLevel, player.level); player.vx *= 0.45; player.vy *= 0.45; if (player.level >= 10) { runtime.score += 3000; finish("won", "\u4f60\u5408\u6210\u4e86\u4f20\u8bf4\u4e2d\u7684\u67ff\u5b50"); return; } } } }
-  if (runtime.elapsed - runtime.lastSpawnAt > Math.max(950, 2300 - stage * 260)) { runtime.lastSpawnAt = runtime.elapsed; const desired = 16 + stage * 12 + Math.round(difficulty * 18) + runtime.player.level * 2; if (runtime.toppings.length < desired) addToppings(runtime, Math.min(4 + stage * 3, desired - runtime.toppings.length)); }
+  if (runtime.elapsed - runtime.lastSpawnAt > Math.max(850, 2700 - stage * 310)) { runtime.lastSpawnAt = runtime.elapsed; const desired = 9 + stage * 7 + Math.round(difficulty * 12) + runtime.player.level * 3; if (runtime.toppings.length < desired) addToppings(runtime, Math.min(2 + stage * 2, desired - runtime.toppings.length)); }
   updateCamera(runtime);
 }
 
@@ -240,7 +252,7 @@ export function MilkTeaGame() {
   const startGame = () => { const runtime = createRuntime(); runtimeRef.current = runtime; setFinalStats(null); setSaved(false); setHud({ level: 1, progress: 1, score: 0, elapsed: 0, message: TXT.defaultHint }); setStatus("playing"); };
   const openLeaderboard = () => { setLeaderboard(loadLeaderboard()); setStatus("leaderboard"); };
   const handlePointer = (event: React.PointerEvent<HTMLCanvasElement>) => { if (event.pointerType === "touch") return; if (event.type === "pointerdown") event.currentTarget.setPointerCapture(event.pointerId); updateTargetFromClient(event.clientX, event.clientY); };
-  const stopPointer = () => { if (runtimeRef.current) { runtimeRef.current.target.active = false; runtimeRef.current.player.vx = 0; runtimeRef.current.player.vy = 0; } };
+  const stopPointer = () => { if (runtimeRef.current) { runtimeRef.current.player.vx = 0; runtimeRef.current.player.vy = 0; } };
   const persistScore = () => { if (!finalStats || saved) return; const next = saveLeaderboard({ name: (playerName.trim() || TXT.defaultName).slice(0, 12), score: finalStats.score, elapsed: finalStats.elapsed, highestLevel: finalStats.highestLevel, result: finalStats.result, date: new Date().toLocaleString("zh-CN") }); setLeaderboard(next); setSaved(true); };
   const current = levelInfo(hud.level), next = hud.level < 10 ? levelInfo(hud.level + 1) : null, finalLevelName = finalStats ? levelInfo(finalStats.highestLevel).name : current.name;
   const joystickRef = useRef<HTMLDivElement | null>(null);
