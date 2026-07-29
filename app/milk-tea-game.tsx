@@ -67,8 +67,8 @@ function chooseSpawnLevel(playerLevel: number, elapsed = 0) {
   const weights = levels.map((level) => {
     const delta = level - playerLevel;
     if (delta <= -4) return 0.03;
-    if (delta < 0) return Math.max(0.08, 1.35 - pressure * 1.55 + delta * 0.2);
-    if (delta === 0) return 2.0 + pressure * 0.4;
+    if (delta < 0) return Math.max(0.04, (1.35 - pressure * 1.55 + delta * 0.2) * 0.5);
+    if (delta === 0) return (2.0 + pressure * 0.4) * 0.5;
     if (delta === 1) return 1.15 + pressure * 2.2;
     return 0.42 + pressure * 1.7;
   });
@@ -130,20 +130,19 @@ function drawAssetBetween(ctx: CanvasRenderingContext2D, image: HTMLImageElement
 }
 function drawIngredient(ctx: CanvasRenderingContext2D, item: { x: number; y: number; radius: number; level: number }, isPlayer = false, assets: AssetImageMap = {}) {
   const lv = levelInfo(item.level); ctx.save(); ctx.translate(item.x, item.y);
-  if (isPlayer) {
-    ctx.fillStyle = "rgba(255, 244, 166, 0.34)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + 8, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "rgba(126, 60, 16, 0.72)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, item.radius + 5, 0, Math.PI * 2); ctx.stroke();
-  }
   const image = assetImage(assets, lv.assetId);
   if (image) {
     const size = item.radius * 2.9;
+    if (isPlayer) ctx.filter = "drop-shadow(0 0 2px rgba(255,210,84,1)) drop-shadow(0 0 4px rgba(255,184,42,0.95))";
     ctx.drawImage(image, -size / 2, -size / 2, size, size);
+    ctx.filter = "none";
   } else {
     const points = Math.max(5, Math.min(8, item.level + 4));
     ctx.fillStyle = lv.color; ctx.beginPath();
     for (let i = 0; i < points; i += 1) { const angle = -Math.PI / 2 + i / points * Math.PI * 2, r = item.radius * (i % 2 ? 0.82 : 1); const x = Math.cos(angle) * r, y = Math.sin(angle) * r; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
     ctx.closePath(); ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.72)"; ctx.lineWidth = Math.max(1.5, item.radius * 0.12); ctx.stroke();
   }
+  if (isPlayer && !image) { ctx.strokeStyle = "rgba(255, 210, 84, 0.96)"; ctx.lineWidth = Math.max(3, item.radius * 0.16); ctx.lineJoin = "round"; ctx.stroke(); }
   ctx.restore();
 }
 function drawPlayerWithCarried(ctx: CanvasRenderingContext2D, runtime: Runtime, assets: AssetImageMap) {
