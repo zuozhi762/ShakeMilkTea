@@ -11,6 +11,7 @@ const VIEW_SCALE = 1.75;
 const CUP = { topY: 46, bottomY: 1188, topW: 575, bottomW: 405, centerX: WORLD_WIDTH / 2 };
 const CUP_CENTER = { x: CUP.centerX, y: (CUP.topY + CUP.bottomY) / 2 };
 const LEADERBOARD_KEY = "shake_milk_tea_leaderboard";
+const LEADERBOARD_API = typeof window === "undefined" ? "" : (window.__MILK_TEA_LEADERBOARD_API__ ?? "/api/leaderboard");
 const EDGE_TOUCH_RATIO = 0.35;
 const TXT = {
   defaultName: "\u533f\u540d\u5c0f\u6599",
@@ -44,16 +45,19 @@ type Runtime = { running: boolean; startTime: number; lastTime: number; elapsed:
 type Hud = { level: number; progress: number; score: number; elapsed: number; message: string };
 type ScoreRecord = { name: string; score: number; elapsed: number; highestLevel: number; result: "won" | "lost"; date: string };
 type FinalStats = Omit<ScoreRecord, "name" | "date"> & { reason: string };
+declare global { interface Window { __MILK_TEA_LEADERBOARD_API__?: string } }
 
 const levelInfo = (level: number) => LEVELS[Math.max(0, Math.min(LEVELS.length - 1, level - 1))];
-const radiusForLevel = (level: number) => 8.6 * levelInfo(level).scale;
+const radiusForLevel = (level: number) => (level === 1 ? 7.2 : 8.6 * levelInfo(level).scale);
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 function formatTime(ms: number) { const t = Math.max(0, Math.floor(ms / 1000)); return Math.floor(t / 60).toString().padStart(2, "0") + ":" + (t % 60).toString().padStart(2, "0"); }
-function loadLeaderboard(): ScoreRecord[] { if (typeof window === "undefined") return []; try { const raw = window.localStorage.getItem(LEADERBOARD_KEY); return raw ? JSON.parse(raw) as ScoreRecord[] : []; } catch { return []; } }
+function loadLocalLeaderboard(): ScoreRecord[] { if (typeof window === "undefined") return []; try { const raw = window.localStorage.getItem(LEADERBOARD_KEY); return raw ? JSON.parse(raw) as ScoreRecord[] : []; } catch { return []; } }
+function saveLocalLeaderboard(record: ScoreRecord) { const next = sortLeaderboard([...loadLocalLeaderboard(), record]); window.localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(next)); return next; }
+async function loadLeaderboard(): Promise<ScoreRecord[]> { if (typeof window === "undefined") return []; try { const response = await fetch(LEADERBOARD_API, { cache: "no-store" }); if (response.ok) { const data = await response.json() as { records?: ScoreRecord[] }; return sortLeaderboard(data.records ?? []); } } catch {} return loadLocalLeaderboard(); }
+async function saveLeaderboard(record: ScoreRecord): Promise<ScoreRecord[]> { if (typeof window !== "undefined") saveLocalLeaderboard(record); try { const response = await fetch(LEADERBOARD_API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(record) }); if (response.ok) { const data = await response.json() as { records?: ScoreRecord[] }; return sortLeaderboard(data.records ?? []); } } catch {} return loadLocalLeaderboard(); }
 function sortLeaderboard(records: ScoreRecord[]) { return records.sort((a, b) => a.result !== b.result ? (a.result === "won" ? -1 : 1) : a.highestLevel !== b.highestLevel ? b.highestLevel - a.highestLevel : a.score !== b.score ? b.score - a.score : b.elapsed - a.elapsed).slice(0, 10); }
-function saveLeaderboard(record: ScoreRecord) { const next = sortLeaderboard([...loadLeaderboard(), record]); window.localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(next)); return next; }
 
 const cupT = (y: number) => clamp((y - CUP.topY) / (CUP.bottomY - CUP.topY), 0, 1);
 function cupHalfWidthAt(y: number) { const t = cupT(y); return CUP.topW / 2 + (CUP.bottomW / 2 - CUP.topW / 2) * t; }
@@ -63,16 +67,15 @@ function clampPointToCup(x: number, y: number, radius: number) { const edgeRadiu
 function randomCupPoint(radius: number) { const y = rand(CUP.topY + radius + 18, CUP.bottomY - radius - 18); const b = cupBoundsAt(y, radius + 14); return { x: rand(b.left, b.right), y }; }
 function difficultyStage(elapsed: number, playerLevel: number) { return Math.min(5, Math.max(Math.floor(elapsed / 30000), Math.floor((playerLevel - 1) / 2))); }
 function chooseSpawnLevel(playerLevel: number, elapsed = 0) {
-  const stage = difficultyStage(elapsed, playerLevel), maxLevel = Math.min(9, playerLevel + 2), minLevel = Math.max(1, Math.min(playerLevel - 3, stage));
+  const stage = difficultyStage(elapsed, playerLevel), maxLevel = Math.min(9, playerLevel + 2), minLevel = Math.max(1, Math.min(playerLevel - 4, stage - 1));
   const levels = Array.from({ length: maxLevel - minLevel + 1 }, (_, i) => minLevel + i);
   const pressure = clamp((playerLevel - 1) / 9 + elapsed / 180000, 0, 1.35);
   const weights = levels.map((level) => {
     const delta = level - playerLevel;
-    if (delta <= -4) return 0.03;
-    if (delta < 0) return Math.max(0.04, (1.35 - pressure * 1.55 + delta * 0.2) * 0.5);
-    if (delta === 0) return (2.0 + pressure * 0.4) * 0.5;
-    if (delta === 1) return 1.15 + pressure * 2.2;
-    return 0.42 + pressure * 1.7;
+    if (delta > 0) return 1.45 + pressure * 2.25 + delta * 0.35;
+    if (delta === 0) return 0.16 + pressure * 0.12;
+    if (delta >= -1) return 0.45 + pressure * 0.22;
+    return 0.8 + pressure * 0.55;
   });
   const total = weights.reduce((s, n) => s + n, 0); let roll = Math.random() * total;
   for (let i = 0; i < weights.length; i += 1) { roll -= weights[i]; if (roll <= 0) return levels[i]; }
@@ -111,7 +114,7 @@ function triggerShake(runtime: Runtime, now: number) { runtime.event = { kind: "
 function strawDifficulty(runtime: Runtime) { return clamp(runtime.elapsed / 135000 + Math.max(0, runtime.player.level - 1) / 18, 0, 1.45); }
 function strawPeriod(runtime: Runtime) { const stage = difficultyStage(runtime.elapsed, runtime.player.level); return Math.max(430, 860 - strawDifficulty(runtime) * 180 - stage * 18); }
 function buildStrawStabs(runtime: Runtime): StrawStab[] {
-  const d = strawDifficulty(runtime), spread = 0.5 + d * 0.06, y0 = CUP.topY + 245, y1 = CUP.topY + 470, y2 = CUP.topY + 695;
+  const d = strawDifficulty(runtime), spread = 0.5 + d * 0.06, y0 = CUP.topY + 360, y1 = CUP.topY + 610, y2 = CUP.topY + 860;
   const points = [
     { x: CUP.centerX - cupHalfWidthAt(y0) * spread, y: y0 },
     { x: CUP.centerX, y: y1 },
@@ -279,15 +282,15 @@ export function MilkTeaGame() {
     });
     return () => { disposed = true; };
   }, []);
-  useEffect(() => { setLeaderboard(loadLeaderboard()); }, []);
+  useEffect(() => { void loadLeaderboard().then(setLeaderboard); }, []);
   useEffect(() => { const down = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k)) { e.preventDefault(); runtimeRef.current?.keys.add(k); } }; const up = (e: KeyboardEvent) => runtimeRef.current?.keys.delete(e.key.toLowerCase()); window.addEventListener("keydown", down); window.addEventListener("keyup", up); return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); }; }, []);
   useEffect(() => { if (status !== "playing") return; const movePointer = (event: PointerEvent) => { if (event.pointerType !== "touch") updateTargetFromClient(event.clientX, event.clientY); }; window.addEventListener("pointermove", movePointer); return () => { window.removeEventListener("pointermove", movePointer); }; }, [status]);
   useEffect(() => { const canvas = canvasRef.current, ctx = canvas?.getContext("2d"); if (!ctx || !canvas) return; let frame = 0; const finish = (result: "won" | "lost", reason: string) => { const runtime = runtimeRef.current; if (!runtime || !runtime.running) return; runtime.running = false; setFinalStats({ result, reason, score: runtime.score, elapsed: runtime.elapsed, highestLevel: runtime.highestLevel }); setSaved(false); setStatus(result); }; const loop = (now: number) => { const runtime = runtimeRef.current; if (!runtime || !runtime.running) return; const dt = Math.min(0.033, Math.max(0.001, (now - runtime.lastTime) / 1000)); runtime.lastTime = now; updateRuntime(runtime, dt, now, finish); drawScene(ctx, runtime, "playing", assetImagesRef.current); if (now - runtime.lastHudAt > 100) { runtime.lastHudAt = now; setHud({ level: runtime.player.level, progress: runtime.player.progress, score: runtime.score, elapsed: runtime.elapsed, message: eventMessage(runtime.event) }); } frame = window.requestAnimationFrame(loop); }; if (status === "playing") frame = window.requestAnimationFrame(loop); else drawScene(ctx, runtimeRef.current, status, assetImagesRef.current); return () => window.cancelAnimationFrame(frame); }, [status, assetRevision]);
   const startGame = () => { const runtime = createRuntime(); runtimeRef.current = runtime; setFinalStats(null); setSaved(false); setHud({ level: 1, progress: 1, score: 0, elapsed: 0, message: TXT.defaultHint }); setStatus("playing"); };
-  const openLeaderboard = () => { setLeaderboard(loadLeaderboard()); setStatus("leaderboard"); };
+  const openLeaderboard = () => { setStatus("leaderboard"); void loadLeaderboard().then(setLeaderboard); };
   const handlePointer = (event: React.PointerEvent<HTMLCanvasElement>) => { if (event.pointerType === "touch") return; if (event.type === "pointerdown") event.currentTarget.setPointerCapture(event.pointerId); updateTargetFromClient(event.clientX, event.clientY); };
   const stopPointer = () => { if (runtimeRef.current) { runtimeRef.current.player.vx = 0; runtimeRef.current.player.vy = 0; } };
-  const persistScore = () => { if (!finalStats || saved) return; const next = saveLeaderboard({ name: (playerName.trim() || TXT.defaultName).slice(0, 12), score: finalStats.score, elapsed: finalStats.elapsed, highestLevel: finalStats.highestLevel, result: finalStats.result, date: new Date().toLocaleString("zh-CN") }); setLeaderboard(next); setSaved(true); };
+  const persistScore = () => { if (!finalStats || saved) return; const record = { name: (playerName.trim() || TXT.defaultName).slice(0, 12), score: finalStats.score, elapsed: finalStats.elapsed, highestLevel: finalStats.highestLevel, result: finalStats.result, date: new Date().toLocaleString("zh-CN") }; setSaved(true); void saveLeaderboard(record).then(setLeaderboard).catch(() => setSaved(false)); };
   const current = levelInfo(hud.level), next = hud.level < 10 ? levelInfo(hud.level + 1) : null, finalLevelName = finalStats ? levelInfo(finalStats.highestLevel).name : current.name;
   const joystickRef = useRef<HTMLDivElement | null>(null);
   const [joystickActive, setJoystickActive] = useState(false);
@@ -305,7 +308,7 @@ export function MilkTeaGame() {
         {status === "playing" && <div ref={joystickRef} className={"joystick" + (joystickActive ? " active" : "")} onPointerDown={startJoystick} onPointerMove={updateJoystick} onPointerUp={stopJoystick} onPointerCancel={stopJoystick} aria-label="virtual joystick"><span ref={joystickKnobRef} /></div>}
         {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u25cb"}</div><h1>{"\u6447\u6447\u5976\u8336\u5927\u5408\u6210"}</h1><p>{"PC \u4f7f\u7528\u9f20\u6807\u6216 WASD\uff0c\u624b\u673a\u4f7f\u7528\u5de6\u4e0b\u6447\u6746\u3002\u5408\u6210\u5c0f\u6599\uff0c\u8eb2\u5f00\u8fde\u7eed\u6233\u4e0b\u6765\u7684\u5438\u7ba1\u3002"}</p><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={openLeaderboard}>{"\u6392\u884c\u699c"}</button></div>}
         {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" && victoryBurstUrl ? <img src={victoryBurstUrl} alt="" /> : status === "lost" && strawUrl ? <img src={strawUrl} alt="" /> : status === "won" ? "\u25cb" : "|"}</div><h2>{status === "won" ? "\u8d85\u7ea7\u65e0\u654c\u597d\u559d\u5730\u80dc\u5229\uff01" : "\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h2><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row"><button onClick={persistScore} disabled={saved}>{saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9"}</button><button className="secondary" onClick={startGame}>{"\u518d\u6765\u4e00\u5c40"}</button></div><button className="ghost" onClick={openLeaderboard}>{"\u770b\u6392\u884c\u699c"}</button></div>}
-        {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u672c\u5730\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row"><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={() => setStatus("menu")}>{"\u8fd4\u56de"}</button></div></div>}
+        {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u5168\u5c40\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row"><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={() => setStatus("menu")}>{"\u8fd4\u56de"}</button></div></div>}
       </section>
     </main>
   );
