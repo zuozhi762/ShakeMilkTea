@@ -166,6 +166,35 @@ h2 {
   font-weight: 800;
 }
 
+.mobile-joystick {
+  display: none;
+  position: absolute;
+  left: 28px;
+  bottom: 74px;
+  z-index: 7;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  background: rgba(255, 248, 228, 0.42);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.5),
+    0 10px 28px rgba(69, 30, 8, 0.18);
+  backdrop-filter: blur(6px);
+  touch-action: none;
+  user-select: none;
+}
+
+.joystick-knob {
+  position: absolute;
+  inset: 27px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #ffe07a, #ff944d);
+  box-shadow:
+    inset 0 2px 5px rgba(255, 255, 255, 0.6),
+    0 7px 16px rgba(91, 42, 10, 0.28);
+  will-change: transform;
+}
+
 .hud > div {
   min-width: 0;
   border-radius: 16px;
@@ -432,6 +461,18 @@ h2 {
 
   .bottom-hud {
     bottom: 16px;
+  }
+
+  .mobile-joystick {
+    display: block;
+    left: 20px;
+    bottom: 67px;
+    width: 96px;
+    height: 96px;
+  }
+
+  .joystick-knob {
+    inset: 25px;
   }
 
   .hud {
