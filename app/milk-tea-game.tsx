@@ -12,13 +12,14 @@ const CUP = { topY: 46, bottomY: 1188, topW: 575, bottomW: 405, centerX: WORLD_W
 const CUP_CENTER = { x: CUP.centerX, y: (CUP.topY + CUP.bottomY) / 2 };
 const LEADERBOARD_KEY = "shake_milk_tea_leaderboard";
 const EDGE_TOUCH_RATIO = 0.35;
+const PLAYER_SPEED_MULTIPLIER = 2;
 const TXT = {
   defaultName: "\u533f\u540d\u5c0f\u6599",
-  defaultHint: "\u955c\u5934\u53ea\u770b\u6574\u676f\u7ea6 1/3\uff0c\u8ffd\u7740\u5c0f\u6599\u63a2\u7d22\u3002",
+  defaultHint: "\u6309\u4f4f\u6ed1\u52a8\u63a7\u5236\u65b9\u5411\uff0c\u8ffd\u7740\u5c0f\u6599\u63a2\u7d22\u3002",
   shakeWarn: "\u26a0\ufe0f \u5976\u8336\u8981\u88ab\u5927\u529b\u6447\u5566\uff01",
   shaking: "\u{1f9cb} \u5de6\u53f3\u72c2\u6447\uff01\u6574\u676f\u5c0f\u6599\u90fd\u7529\u8d77\u6765\u4e86\uff01",
-  strawWarn: "\u26a0\ufe0f \u5438\u7ba1\u8981\u6765\u4e86\uff0c\u5feb\u8eb2\u5f00\u7ea2\u5708\uff01",
-  strawActive: "\u{1f964} \u5438\u7ba1\u6b63\u5728\u5438\uff01\u522b\u9760\u592a\u8fd1\uff01",
+  strawWarn: "\u26a0\ufe0f \u5438\u7ba1\u8981\u4e09\u8fde\u6233\u4e0b\u6765\u4e86\uff0c\u770b\u51c6\u8d34\u7eb8\u5708\uff01",
+  strawActive: "\u{1f964} \u5438\u7ba1\u659c\u63d2\u8fdb\u6765\u5438\u5c0f\u6599\uff01\u522b\u88ab\u5438\u5230\uff01",
 };
 
 const LEVELS = TOPPING_LEVELS;
@@ -37,12 +38,13 @@ type Status = "menu" | "playing" | "won" | "lost" | "leaderboard";
 type EventKind = "idle" | "shakeWarning" | "shaking" | "strawWarning" | "strawActive";
 type Topping = { id: number; x: number; y: number; vx: number; vy: number; level: number; radius: number; spin: number };
 type Player = { x: number; y: number; vx: number; vy: number; level: number; progress: number; radius: number; carried: number[] };
-type ActiveEvent = { kind: EventKind; until: number; started: number; x?: number; y?: number; swing?: number };
+type StrawStab = { x: number; y: number; fromX: number; fromY: number };
+type ActiveEvent = { kind: EventKind; until: number; started: number; x?: number; y?: number; swing?: number; stabs?: StrawStab[]; jabMs?: number };
 type Runtime = { running: boolean; startTime: number; lastTime: number; elapsed: number; score: number; highestLevel: number; nextId: number; nextShakeAt: number; nextStrawAt: number; lastSpawnAt: number; lastHudAt: number; player: Player; toppings: Topping[]; target: { x: number; y: number; active: boolean }; joystick: { x: number; y: number; active: boolean }; keys: Set<string>; event: ActiveEvent; camera: { x: number; y: number }; shakeAngle: number; shakePower: number };
 type Hud = { level: number; progress: number; score: number; elapsed: number; message: string };
 type ScoreRecord = { name: string; score: number; elapsed: number; highestLevel: number; result: "won" | "lost"; date: string };
 type FinalStats = Omit<ScoreRecord, "name" | "date"> & { reason: string };
-type TouchStick = { pointerId: number; startX: number; startY: number } | null;
+type TouchStick = { pointerId: number; anchorX: number; anchorY: number; lastX: number; lastY: number } | null;
 
 let worldCache: { canvas: HTMLCanvasElement; assetCount: number } | null = null;
 
@@ -100,8 +102,31 @@ function normalizePlayerInventory(player: Player) {
 }
 function eventMessage(event: ActiveEvent) { if (event.kind === "shakeWarning") return TXT.shakeWarn; if (event.kind === "shaking") return TXT.shaking; if (event.kind === "strawWarning") return TXT.strawWarn; if (event.kind === "strawActive") return TXT.strawActive; return TXT.defaultHint; }
 function triggerShake(runtime: Runtime, now: number) { runtime.event = { kind: "shakeWarning", until: now + 800, started: now, swing: Math.random() > 0.5 ? 1 : -1 }; }
-function triggerStraw(runtime: Runtime, now: number) { const p = randomCupPoint(28); p.y = rand(CUP.topY + 170, CUP.bottomY - 210); runtime.event = { kind: "strawWarning", until: now + 1300, started: now, x: p.x, y: p.y }; }
-function strawCenter(runtime: Runtime, now: number) { const baseX = runtime.event.x ?? CUP.centerX, baseY = runtime.event.y ?? CUP.topY + 320, d = Math.min(runtime.elapsed / 160000, 1); const y = clamp(baseY + (runtime.elapsed > 80000 ? Math.cos(now / 430) * 48 * d : 0), CUP.topY + 120, CUP.bottomY - 120); const b = cupBoundsAt(y, 42); return { x: clamp(baseX + Math.sin(now / 360) * 60 * (0.45 + d), b.left, b.right), y }; }
+function strawDifficulty(runtime: Runtime) { return Math.min(1, runtime.elapsed / 155000 + Math.max(0, runtime.player.level - 1) / 18); }
+function makeStrawStabs(runtime: Runtime): StrawStab[] {
+  const d = strawDifficulty(runtime);
+  return [0, 1, 2].map((index) => {
+    const y = CUP.topY + 210 + index * 245 + rand(-34, 54);
+    const radius = 44;
+    const b = cupBoundsAt(y, radius);
+    const x = rand(b.left + 20, b.right - 20);
+    const side = Math.random() > 0.5 ? 1 : -1;
+    return { x, y, fromX: clamp(x - side * (190 - d * 36), CUP.centerX - CUP.topW / 2 - 120, CUP.centerX + CUP.topW / 2 + 120), fromY: CUP.topY - 185 - index * 12 };
+  });
+}
+function triggerStraw(runtime: Runtime, now: number) { const d = strawDifficulty(runtime), stabs = makeStrawStabs(runtime); runtime.event = { kind: "strawWarning", until: now + 1050 - d * 360, started: now, stabs, jabMs: 1120 - d * 480 }; }
+function currentStrawStab(runtime: Runtime, now: number) {
+  const stabs = runtime.event.stabs ?? [];
+  if (stabs.length === 0) return null;
+  const jabMs = runtime.event.jabMs ?? 960;
+  const elapsed = Math.max(0, now - runtime.event.started);
+  const index = Math.min(2, Math.floor(elapsed / jabMs));
+  const local = clamp((elapsed - index * jabMs) / jabMs, 0, 1);
+  const stab = stabs[index];
+  const plunge = local < 0.46 ? local / 0.46 : local < 0.7 ? 1 : 1 - (local - 0.7) / 0.3;
+  const eased = plunge < 0.5 ? 2 * plunge * plunge : 1 - Math.pow(-2 * plunge + 2, 2) / 2;
+  return { ...stab, index, local, x: stab.fromX + (stab.x - stab.fromX) * eased, y: stab.fromY + (stab.y - stab.fromY) * eased, activeSuction: local > 0.3 && local < 0.78 };
+}
 function keepInCup(item: { x: number; y: number; vx: number; vy: number; radius: number }) { const oldX = item.x, oldY = item.y; const p = clampPointToCup(item.x, item.y, item.radius); item.x = p.x; item.y = p.y; if (Math.abs(item.x - oldX) > 0.01) item.vx *= -0.72; if (Math.abs(item.y - oldY) > 0.01) item.vy *= -0.72; }
 function drawCupPath(ctx: CanvasRenderingContext2D, expand = 0) { const topHalf = CUP.topW / 2 + expand, bottomHalf = CUP.bottomW / 2 + expand; ctx.beginPath(); ctx.moveTo(CUP.centerX - topHalf, CUP.topY - expand); ctx.lineTo(CUP.centerX + topHalf, CUP.topY - expand); ctx.lineTo(CUP.centerX + bottomHalf, CUP.bottomY + expand); ctx.lineTo(CUP.centerX - bottomHalf, CUP.bottomY + expand); ctx.closePath(); }
 function drawAssetCentered(ctx: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, width: number, height: number, alpha = 1) {
@@ -144,9 +169,9 @@ function drawPlayerWithCarried(ctx: CanvasRenderingContext2D, runtime: Runtime, 
   pieces.forEach((level, index) => { if (level <= 0) return; const ring = Math.floor(index / 12), slot = index % 12; const angle = slot / 12 * Math.PI * 2 + ring * 0.38 + time * (0.8 + ring * 0.12); const orbit = player.radius + 8 + ring * 8.5 + Math.sin(time * 4.2 + index) * 2.2; const pieceRadius = clamp(radiusForLevel(level) * 0.44, 4.2, Math.max(5.2, player.radius * 0.44)); drawIngredient(ctx, { x: player.x + Math.cos(angle) * orbit, y: player.y + Math.sin(angle) * orbit, level, radius: pieceRadius }, false, assets); });
 }
 function drawWorldBackground(ctx: CanvasRenderingContext2D) {
-  const bg = ctx.createLinearGradient(0, 0, 0, WORLD_HEIGHT); bg.addColorStop(0, "#fff2c9"); bg.addColorStop(0.45, "#f0b967"); bg.addColorStop(1, "#98542d"); ctx.fillStyle = bg; ctx.fillRect(-200, -200, WORLD_WIDTH + 400, WORLD_HEIGHT + 400);
-  ctx.fillStyle = "rgba(255,255,255,0.18)"; for (let i = 0; i < 36; i += 1) { ctx.beginPath(); ctx.arc((i * 83) % WORLD_WIDTH, 42 + ((i * 131) % WORLD_HEIGHT), 2 + (i % 5), 0, Math.PI * 2); ctx.fill(); }
-  ctx.strokeStyle = "rgba(255,255,255,0.14)"; ctx.lineWidth = 3;
+  const bg = ctx.createLinearGradient(0, 0, 0, WORLD_HEIGHT); bg.addColorStop(0, "#fff8ee"); bg.addColorStop(0.45, "#ffe5ef"); bg.addColorStop(1, "#dff9ed"); ctx.fillStyle = bg; ctx.fillRect(-200, -200, WORLD_WIDTH + 400, WORLD_HEIGHT + 400);
+  ctx.fillStyle = "rgba(255,255,255,0.42)"; for (let i = 0; i < 42; i += 1) { ctx.beginPath(); ctx.arc((i * 83) % WORLD_WIDTH, 42 + ((i * 131) % WORLD_HEIGHT), 2 + (i % 5), 0, Math.PI * 2); ctx.fill(); }
+  ctx.strokeStyle = "rgba(255,159,189,0.14)"; ctx.lineWidth = 3;
   for (let line = 0; line < 8; line += 1) { ctx.beginPath(); const y = 110 + line * 145; for (let x = -40; x <= WORLD_WIDTH + 40; x += 36) { const wy = y + Math.sin((x + line * 41) / 31) * 8; if (x === -40) ctx.moveTo(x, wy); else ctx.lineTo(x, wy); } ctx.stroke(); }
 }
 function getWorldLayer(assets: AssetImageMap) {
@@ -158,22 +183,22 @@ function getWorldLayer(assets: AssetImageMap) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
   drawWorldBackground(ctx);
-  drawCupPath(ctx, 12); ctx.fillStyle = "rgba(255,255,255,0.26)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.82)"; ctx.lineWidth = 7; ctx.stroke();
+  drawCupPath(ctx, 12); ctx.fillStyle = "rgba(255,255,255,0.48)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.92)"; ctx.lineWidth = 8; ctx.stroke();
   const cupImage = assetImage(assets, "scene-milk-tea-cup");
-  if (cupImage) drawAssetCentered(ctx, cupImage, CUP.centerX, CUP_CENTER.y, CUP.topW + 86, CUP.bottomY - CUP.topY + 110, 0.45);
-  drawCupPath(ctx); const tea = ctx.createLinearGradient(0, CUP.topY, 0, CUP.bottomY); tea.addColorStop(0, "rgba(255,219,147,0.76)"); tea.addColorStop(0.48, "rgba(188,113,56,0.86)"); tea.addColorStop(1, "rgba(103,54,30,0.92)"); ctx.fillStyle = tea; ctx.fill();
+  if (cupImage) drawAssetCentered(ctx, cupImage, CUP.centerX, CUP_CENTER.y, CUP.topW + 92, CUP.bottomY - CUP.topY + 118, 0.62);
+  drawCupPath(ctx); const tea = ctx.createLinearGradient(0, CUP.topY, 0, CUP.bottomY); tea.addColorStop(0, "rgba(255,238,206,0.82)"); tea.addColorStop(0.48, "rgba(232,184,139,0.84)"); tea.addColorStop(1, "rgba(197,145,117,0.86)"); ctx.fillStyle = tea; ctx.fill();
   const teaSurface = assetImage(assets, "scene-tea-surface");
   if (teaSurface) {
     ctx.save(); drawCupPath(ctx); ctx.clip();
     const pattern = ctx.createPattern(teaSurface, "repeat");
-    if (pattern) { ctx.globalAlpha = 0.34; ctx.fillStyle = pattern; ctx.fillRect(-280, CUP.topY - 80, WORLD_WIDTH + 560, CUP.bottomY - CUP.topY + 180); }
+    if (pattern) { ctx.globalAlpha = 0.24; ctx.fillStyle = pattern; ctx.fillRect(-280, CUP.topY - 80, WORLD_WIDTH + 560, CUP.bottomY - CUP.topY + 180); }
     ctx.restore();
   }
   worldCache = { canvas, assetCount };
   return canvas;
 }
 function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, status: Status, assets: AssetImageMap = {}) {
-  ctx.clearRect(0, 0, WIDTH, HEIGHT); const screenBg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT); screenBg.addColorStop(0, "#fff7da"); screenBg.addColorStop(1, "#a76538"); ctx.fillStyle = screenBg; ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.clearRect(0, 0, WIDTH, HEIGHT); const screenBg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT); screenBg.addColorStop(0, "#fff8fb"); screenBg.addColorStop(0.55, "#ffe7f0"); screenBg.addColorStop(1, "#ddf8ed"); ctx.fillStyle = screenBg; ctx.fillRect(0, 0, WIDTH, HEIGHT);
   ctx.save(); if (runtime) { ctx.scale(VIEW_SCALE, VIEW_SCALE); ctx.translate(-runtime.camera.x, -runtime.camera.y); } else { ctx.translate((WIDTH - WORLD_WIDTH * 0.42) / 2, 35); ctx.scale(0.42, 0.42); }
   ctx.save(); if (runtime) { ctx.translate(CUP_CENTER.x, CUP_CENTER.y); ctx.rotate(runtime.shakeAngle); ctx.translate(-CUP_CENTER.x, -CUP_CENTER.y); }
   ctx.drawImage(getWorldLayer(assets), 0, 0);
@@ -189,34 +214,46 @@ function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, statu
       }
     }
     if (runtime.event.kind === "strawWarning" || runtime.event.kind === "strawActive") {
-      const c = runtime.event.kind === "strawActive" ? strawCenter(runtime, performance.now()) : { x: runtime.event.x ?? CUP.centerX, y: runtime.event.y ?? 320 };
       const ringImage = assetImage(assets, "effect-suction-ring");
-      if (ringImage) drawAssetCentered(ctx, ringImage, c.x, c.y, 142, 142, runtime.event.kind === "strawActive" ? 0.74 : 0.6);
-      else { ctx.fillStyle = runtime.event.kind === "strawActive" ? "rgba(255,52,88,0.16)" : "rgba(255,52,88,0.24)"; ctx.beginPath(); ctx.arc(c.x, c.y, 245, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "rgba(255,52,88,0.68)"; ctx.lineWidth = 4; ctx.setLineDash([12, 10]); ctx.beginPath(); ctx.arc(c.x, c.y, 62, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
-      if (runtime.event.kind === "strawActive") for (let ring = 0; ring < 6; ring += 1) { ctx.strokeStyle = "rgba(255,255,255," + (0.5 - ring * 0.06) + ")"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(c.x, c.y, 45 + ring * 42 + Math.sin(runtime.elapsed / 72 + ring) * 10, 0.2 + ring, Math.PI * 1.66 + ring); ctx.stroke(); }
+      const marks = runtime.event.kind === "strawActive" ? [currentStrawStab(runtime, performance.now())].filter(Boolean) : runtime.event.stabs ?? [];
+      marks.forEach((mark, index) => {
+        if (!mark) return;
+        const alpha = runtime.event.kind === "strawActive" ? 0.78 : 0.44 + index * 0.08;
+        if (ringImage) drawAssetCentered(ctx, ringImage, mark.x, mark.y, 138, 138, alpha);
+        else { ctx.fillStyle = runtime.event.kind === "strawActive" ? "rgba(255,105,137,0.13)" : "rgba(255,105,137,0.2)"; ctx.beginPath(); ctx.arc(mark.x, mark.y, 94, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "rgba(255,105,137,0.72)"; ctx.lineWidth = 4; ctx.setLineDash([10, 8]); ctx.beginPath(); ctx.arc(mark.x, mark.y, 54, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+        if (runtime.event.kind === "strawActive") for (let ring = 0; ring < 4; ring += 1) { ctx.strokeStyle = "rgba(255,255,255," + (0.48 - ring * 0.07) + ")"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(mark.x, mark.y, 38 + ring * 31 + Math.sin(runtime.elapsed / 74 + ring) * 7, 0.15 + ring, Math.PI * 1.7 + ring); ctx.stroke(); }
+      });
     }
     runtime.toppings.forEach((item) => drawIngredient(ctx, item, false, assets)); drawPlayerWithCarried(ctx, runtime, assets);
     if (runtime.event.kind === "strawActive") {
-      const c = strawCenter(runtime, performance.now());
+      const c = currentStrawStab(runtime, performance.now());
       const strawImage = assetImage(assets, "scene-straw");
-      if (strawImage) drawAssetBetween(ctx, strawImage, { x: c.x - 70, y: CUP.topY - 115 }, c, 84, 88);
-      else { ctx.save(); ctx.lineCap = "round"; ctx.lineWidth = 22; ctx.strokeStyle = "#ff7b93"; ctx.beginPath(); ctx.moveTo(c.x - 70, CUP.topY - 115); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.lineWidth = 8; ctx.strokeStyle = "rgba(255,255,255,0.92)"; ctx.setLineDash([22, 20]); ctx.beginPath(); ctx.moveTo(c.x - 70, CUP.topY - 115); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.restore(); }
+      if (c && strawImage) drawAssetBetween(ctx, strawImage, { x: c.fromX, y: c.fromY }, c, 92, 118);
+      else if (c) { ctx.save(); ctx.lineCap = "round"; ctx.lineWidth = 24; ctx.strokeStyle = "#ff8fab"; ctx.beginPath(); ctx.moveTo(c.fromX, c.fromY); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.lineWidth = 8; ctx.strokeStyle = "rgba(255,255,255,0.92)"; ctx.setLineDash([22, 20]); ctx.beginPath(); ctx.moveTo(c.fromX, c.fromY); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.restore(); }
     }
   } else { const titleImage = assetImage(assets, "ui-title-badge"); if (titleImage) drawAssetCentered(ctx, titleImage, CUP.centerX, CUP_CENTER.y + 20, 210, 210, 0.9); else { ctx.font = "132px sans-serif"; ctx.textAlign = "center"; ctx.fillText("\u{1f9cb}", CUP.centerX, CUP_CENTER.y + 40); } }
-  ctx.restore(); ctx.restore(); ctx.restore(); ctx.fillStyle = "rgba(77,39,20,0.18)"; ctx.fillRect(0, HEIGHT - 28, WIDTH, 28); if (status !== "playing") { ctx.fillStyle = "rgba(67,31,16,0.22)"; ctx.fillRect(0, 0, WIDTH, HEIGHT); }
+  ctx.restore(); ctx.restore(); ctx.restore(); ctx.fillStyle = "rgba(255,159,189,0.12)"; ctx.fillRect(0, HEIGHT - 28, WIDTH, 28); if (status !== "playing") { ctx.fillStyle = "rgba(90,59,70,0.13)"; ctx.fillRect(0, 0, WIDTH, HEIGHT); }
 }
 function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (result: "won" | "lost", reason: string) => void) {
   runtime.elapsed = now - runtime.startTime; const player = runtime.player; const difficulty = Math.min(runtime.elapsed / 150000, 1), stage = difficultyStage(runtime.elapsed, player.level);
   if (runtime.event.kind === "idle") { if (runtime.elapsed >= runtime.nextShakeAt) triggerShake(runtime, now); else if (runtime.elapsed >= runtime.nextStrawAt) triggerStraw(runtime, now); }
   else if (runtime.event.kind === "shakeWarning" && now >= runtime.event.until) { runtime.event = { ...runtime.event, kind: "shaking", until: now + 1850, started: now }; runtime.shakePower = 1; }
   else if (runtime.event.kind === "shaking" && now >= runtime.event.until) { runtime.score += 100; runtime.event = { kind: "idle", until: 0, started: now }; runtime.nextShakeAt = runtime.elapsed + rand(11000 - difficulty * 3500, 19000 - difficulty * 4500); }
-  else if (runtime.event.kind === "strawWarning" && now >= runtime.event.until) runtime.event = { ...runtime.event, kind: "strawActive", until: now + 5000, started: now };
-  else if (runtime.event.kind === "strawActive" && now >= runtime.event.until) { runtime.score += 200; runtime.event = { kind: "idle", until: 0, started: now }; runtime.nextStrawAt = runtime.elapsed + rand(17000 - difficulty * 5500, 28500 - difficulty * 7600); }
+  else if (runtime.event.kind === "strawWarning" && now >= runtime.event.until) { const jabMs = runtime.event.jabMs ?? 960; runtime.event = { ...runtime.event, kind: "strawActive", until: now + jabMs * 3, started: now }; }
+  else if (runtime.event.kind === "strawActive" && now >= runtime.event.until) { runtime.score += 260; runtime.event = { kind: "idle", until: 0, started: now }; runtime.nextStrawAt = runtime.elapsed + rand(14500 - difficulty * 4800, 24500 - difficulty * 6500); }
   const keyX = (runtime.keys.has("arrowright") || runtime.keys.has("d") ? 1 : 0) - (runtime.keys.has("arrowleft") || runtime.keys.has("a") ? 1 : 0); const keyY = (runtime.keys.has("arrowdown") || runtime.keys.has("s") ? 1 : 0) - (runtime.keys.has("arrowup") || runtime.keys.has("w") ? 1 : 0); let dirX = runtime.joystick.active ? runtime.joystick.x : keyX, dirY = runtime.joystick.active ? runtime.joystick.y : keyY;
   if (dirX === 0 && dirY === 0 && runtime.target.active) { const dx = runtime.target.x - player.x, dy = runtime.target.y - player.y, len = Math.hypot(dx, dy); if (len > 5) { dirX = dx / len; dirY = dy / len; } } else if (dirX || dirY) { const len = Math.hypot(dirX, dirY); dirX /= len; dirY /= len; }
-  const speedPenalty = (levelInfo(player.level).scale - 1) * 14, accel = 840, maxSpeed = 205 - speedPenalty; player.vx += dirX * accel * dt; player.vy += dirY * accel * dt; const pSpeed = Math.hypot(player.vx, player.vy); if (pSpeed > maxSpeed) { player.vx = player.vx / pSpeed * maxSpeed; player.vy = player.vy / pSpeed * maxSpeed; }
+  const speedPenalty = (levelInfo(player.level).scale - 1) * 14, accel = 840 * PLAYER_SPEED_MULTIPLIER, maxSpeed = (205 - speedPenalty) * PLAYER_SPEED_MULTIPLIER; player.vx += dirX * accel * dt; player.vy += dirY * accel * dt; const pSpeed = Math.hypot(player.vx, player.vy); if (pSpeed > maxSpeed) { player.vx = player.vx / pSpeed * maxSpeed; player.vy = player.vy / pSpeed * maxSpeed; }
   if (runtime.event.kind === "shaking") { const elapsed = now - runtime.event.started, direction = runtime.event.swing ?? 1, pulse = Math.sin(elapsed / 48), swing = direction * pulse; runtime.shakeAngle = swing * 0.18; runtime.shakePower = Math.max(0, 1 - elapsed / 2050); const shakeStrength = 560 + difficulty * 260, lateral = Math.cos(elapsed / 48) * direction; for (const item of [player, ...runtime.toppings]) { const dx = item.x - CUP_CENTER.x, dy = item.y - CUP_CENTER.y, len = Math.max(80, Math.hypot(dx, dy)); const tangentX = -dy / len, tangentY = dx / len, bottomBias = 0.65 + cupT(item.y) * 0.9; item.vx += (tangentX * shakeStrength * swing + lateral * shakeStrength * 0.95) * bottomBias * dt; item.vy += (tangentY * shakeStrength * swing + Math.sin(elapsed / 35) * 170) * bottomBias * dt; } } else { runtime.shakeAngle *= 0.82; runtime.shakePower *= 0.84; }
-  if (runtime.event.kind === "strawActive") { const c = strawCenter(runtime, now), dangerRadius = 48 + difficulty * 18 + stage * 4, pullRadius = 255 + difficulty * 70 + stage * 18, pull = 360 + difficulty * 220 + stage * 55, dPlayer = dist(player, c); if (dPlayer < dangerRadius + player.radius * 0.55) { finish("lost", "\u4f60\u88ab\u5438\u7ba1\u5438\u8d70\u4e86"); return; } if (dPlayer < pullRadius) { const power = (1 - dPlayer / pullRadius) * pull; player.vx += (c.x - player.x) / Math.max(1, dPlayer) * power * dt; player.vy += (c.y - player.y) / Math.max(1, dPlayer) * power * dt; } runtime.toppings = runtime.toppings.filter((item) => { const d = dist(item, c); if (d < dangerRadius + item.radius * 0.3) return false; if (d < pullRadius) { const power = (1 - d / pullRadius) * pull * 0.95; item.vx += (c.x - item.x) / Math.max(1, d) * power * dt; item.vy += (c.y - item.y) / Math.max(1, d) * power * dt; } return true; }); }
+  if (runtime.event.kind === "strawActive") {
+    const c = currentStrawStab(runtime, now);
+    if (c?.activeSuction) {
+      const dangerRadius = 42 + difficulty * 16 + stage * 4, pullRadius = 190 + difficulty * 58 + stage * 16, pull = 520 + difficulty * 310 + stage * 74, dPlayer = dist(player, c);
+      if (dPlayer < dangerRadius + player.radius * 0.55) { finish("lost", "\u4f60\u88ab\u5438\u7ba1\u5438\u8d70\u4e86"); return; }
+      if (dPlayer < pullRadius) { const power = (1 - dPlayer / pullRadius) * pull; player.vx += (c.x - player.x) / Math.max(1, dPlayer) * power * dt; player.vy += (c.y - player.y) / Math.max(1, dPlayer) * power * dt; }
+      runtime.toppings = runtime.toppings.filter((item) => { const d = dist(item, c); if (d < dangerRadius + item.radius * 0.34) return false; if (d < pullRadius) { const power = (1 - d / pullRadius) * pull * 1.08; item.vx += (c.x - item.x) / Math.max(1, d) * power * dt; item.vy += (c.y - item.y) / Math.max(1, d) * power * dt; } return true; });
+    }
+  }
   const damping = Math.pow(runtime.event.kind === "shaking" ? 0.965 : 0.91, dt * 60); player.vx *= damping; player.vy *= damping; player.x += player.vx * dt; player.y += player.vy * dt; keepInCup(player);
   for (const item of runtime.toppings) { const wander = 16 + item.level * 2.4; item.vx += Math.cos(now / 620 + item.spin) * wander * dt; item.vy += Math.sin(now / 760 + item.spin) * wander * dt; const maxItemSpeed = runtime.event.kind === "shaking" ? 360 + difficulty * 120 : 58 + item.level * 5 + difficulty * 24, speed = Math.hypot(item.vx, item.vy); if (speed > maxItemSpeed) { item.vx = item.vx / speed * maxItemSpeed; item.vy = item.vy / speed * maxItemSpeed; } item.x += item.vx * dt; item.y += item.vy * dt; keepInCup(item); }
   for (let i = runtime.toppings.length - 1; i >= 0; i -= 1) { const item = runtime.toppings[i]; if (!isInsideCup(item.x, item.y, item.radius)) continue; if (dist(player, item) < player.radius + item.radius * 0.72) { if (item.level > player.level) { finish("lost", "\u649e\u4e0a\u4e86\u66f4\u5927\u7684" + levelInfo(item.level).name); return; } runtime.toppings.splice(i, 1); const oldLevel = player.level; player.carried[item.level] = (player.carried[item.level] ?? 0) + 1; runtime.score += item.level === oldLevel ? item.level * 20 : item.level * 10; normalizePlayerInventory(player); if (player.level > oldLevel) { for (let level = oldLevel + 1; level <= player.level; level += 1) runtime.score += level * 100; runtime.highestLevel = Math.max(runtime.highestLevel, player.level); player.vx *= 0.45; player.vy *= 0.45; if (player.level >= 10) { runtime.score += 3000; finish("won", "\u4f60\u5408\u6210\u4e86\u4f20\u8bf4\u4e2d\u7684\u67ff\u5b50"); return; } } } }
@@ -259,13 +296,21 @@ export function MilkTeaGame() {
     event.preventDefault();
     if (event.type === "pointerdown") {
       event.currentTarget.setPointerCapture(event.pointerId);
-      touchStickRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY };
+      touchStickRef.current = { pointerId: event.pointerId, anchorX: event.clientX, anchorY: event.clientY, lastX: event.clientX, lastY: event.clientY };
     }
     const stick = touchStickRef.current;
     if (!stick || stick.pointerId !== event.pointerId) return;
-    const maxTravel = 58, deadZone = 5, dx = event.clientX - stick.startX, dy = event.clientY - stick.startY, distance = Math.hypot(dx, dy);
+    const maxTravel = 72, deadZone = 6, dx = event.clientX - stick.anchorX, dy = event.clientY - stick.anchorY, distance = Math.hypot(dx, dy);
     runtime.target.active = false;
-    runtime.joystick = distance <= deadZone ? { x: 0, y: 0, active: true } : { x: dx / Math.max(maxTravel, distance), y: dy / Math.max(maxTravel, distance), active: true };
+    if (distance > maxTravel) {
+      const keepX = dx / distance * maxTravel;
+      const keepY = dy / distance * maxTravel;
+      stick.anchorX = event.clientX - keepX;
+      stick.anchorY = event.clientY - keepY;
+    }
+    stick.lastX = event.clientX;
+    stick.lastY = event.clientY;
+    runtime.joystick = distance <= deadZone ? { x: 0, y: 0, active: true } : { x: dx / distance, y: dy / distance, active: true };
   };
   const stopPointer = (event?: React.PointerEvent<HTMLCanvasElement>) => {
     const runtime = runtimeRef.current;
@@ -278,14 +323,14 @@ export function MilkTeaGame() {
   };
   const persistScore = () => { if (!finalStats || saved) return; const next = saveLeaderboard({ name: (playerName.trim() || TXT.defaultName).slice(0, 12), score: finalStats.score, elapsed: finalStats.elapsed, highestLevel: finalStats.highestLevel, result: finalStats.result, date: new Date().toLocaleString("zh-CN") }); setLeaderboard(next); setSaved(true); };
   const current = levelInfo(hud.level), finalLevelName = finalStats ? levelInfo(finalStats.highestLevel).name : current.name;
-  const menuBadgeUrl = assetUrl("ui-title-badge");
-  const victoryBurstUrl = assetUrl("ui-victory-burst");
+  const menuBadgeUrl = assetUrl("scene-milk-tea-cup");
+  const victoryBurstUrl = assetUrl("topping-persimmon");
   const strawUrl = assetUrl("scene-straw");
   const currentAssetUrl = assetUrl(current.assetId);
   return (
     <main className="game-shell">
       <section className="phone-frame" aria-label="game area"><div className="hud top-hud"><div><small>{"\u5f53\u524d"}</small><strong>{currentAssetUrl ? <img className="hud-icon" src={currentAssetUrl} alt="" /> : current.emoji} {current.name}</strong></div><div><small>{"\u8fdb\u5ea6"}</small><strong>{hud.progress}/3</strong></div><div><small>{"\u65f6\u95f4"}</small><strong>{formatTime(hud.elapsed)}</strong></div></div><canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="game-canvas" onPointerDown={handlePointer} onPointerMove={handlePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer} aria-label="game canvas" /><div className="hud bottom-hud"><span>{hud.message}</span><b>{hud.score} {"\u5206"}</b></div>
-        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u{1f9cb}"}</div><h2>{"\u51c6\u5907\u5f00\u6447\uff01"}</h2><p>{"\u7535\u8111\u7aef\u7528\u9f20\u6807\u6216 WASD\uff1b\u624b\u673a\u7aef\u5728\u4efb\u610f\u4f4d\u7f6e\u6309\u4f4f\u540e\u6ed1\u52a8\uff0c\u5c31\u80fd\u50cf\u4f7f\u7528\u9690\u5f62\u6447\u6746\u4e00\u6837\u63a7\u5236\u79fb\u52a8\u3002\u955c\u5934\u53ea\u663e\u793a\u6574\u676f\u7ea6\u4e09\u5206\u4e4b\u4e00\u3002"}</p><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={openLeaderboard}>{"\u67e5\u770b\u6392\u884c\u699c"}</button></div>}
+        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u{1f9cb}"}</div><h2>{"\u51c6\u5907\u5f00\u6447\uff01"}</h2><p>{"\u7535\u8111\u7aef\u7528\u9f20\u6807\u6216 WASD\uff1b\u624b\u673a\u7aef\u50cf\u53ec\u5524\u795e\u9f99\u4e00\u6837\u6309\u4f4f\u5c4f\u5e55\u6ed1\u52a8\uff0c\u7528\u6ed1\u52a8\u65b9\u5411\u63a7\u5236\u6e38\u52a8\u3002\u5438\u7ba1\u4f1a\u4e09\u8fde\u659c\u63d2\uff0c\u522b\u88ab\u5438\u8d70\u3002"}</p><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={openLeaderboard}>{"\u67e5\u770b\u6392\u884c\u699c"}</button></div>}
         {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" && victoryBurstUrl ? <img src={victoryBurstUrl} alt="" /> : status === "lost" && strawUrl ? <img src={strawUrl} alt="" /> : status === "won" ? "\u{1f7e0}" : "\u{1f964}"}</div><h2>{status === "won" ? "\u8d85\u7ea7\u65e0\u654c\u597d\u559d\u5730\u80dc\u5229\uff01" : "\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h2><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row"><button onClick={persistScore} disabled={saved}>{saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9"}</button><button className="secondary" onClick={startGame}>{"\u518d\u6765\u4e00\u5c40"}</button></div><button className="ghost" onClick={openLeaderboard}>{"\u770b\u6392\u884c\u699c"}</button></div>}
         {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u672c\u5730\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row"><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={() => setStatus("menu")}>{"\u8fd4\u56de\u9996\u9875"}</button></div></div>}
       </section>

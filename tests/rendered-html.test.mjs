@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
-import { access, readFile, readdir } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
-
-const developmentPreviewMeta =
-  /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
-const templateRoot = new URL("../", import.meta.url);
-const previewRoot = new URL("../app/_sites-preview/", import.meta.url);
 
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -28,64 +23,56 @@ async function render() {
   );
 }
 
-test("server-renders the starter loading skeleton", async () => {
+test("server-renders the milk tea game shell", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, developmentPreviewMeta);
-  assert.match(html, /<title>Your site is taking shape<\/title>/i);
-  assert.match(html, /Building your site/);
-  assert.match(html, /Your site is taking shape/);
-  assert.match(
-    html,
-    /Your first version will appear here automatically when it’s ready\./,
-  );
-  assert.doesNotMatch(html, /Codex/);
-  assert.match(html, /react-loading-skeleton/);
-  assert.match(html, /role="status"/);
+  assert.match(html, /<title>摇摇奶茶大合成<\/title>/);
+  assert.match(html, /class="game-shell"/);
+  assert.match(html, /aria-label="game canvas"/);
+  assert.match(html, /开始游戏/);
+  assert.match(html, /查看排行榜/);
+  assert.match(html, /按住屏幕滑动/);
+  assert.match(html, /三连斜插/);
+  assert.match(html, /\/generated-assets\/topping-sago\.png/);
+  assert.match(html, /\/generated-assets\/scene-milk-tea-cup\.png/);
+  assert.doesNotMatch(html, /scene-milk-tea-cup\.svg|scene-straw\.svg/);
 });
 
-test("keeps the loading skeleton scoped and disposable", async () => {
-  const [preview, css, page, layout, packageJson, files] = await Promise.all([
-    readFile(new URL("SkeletonPreview.tsx", previewRoot), "utf8"),
-    readFile(new URL("preview.css", previewRoot), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readdir(previewRoot),
-  ]);
-
-  assert.deepEqual(files.sort(), ["SkeletonPreview.tsx", "preview.css"]);
-  assert.match(preview, /from "react-loading-skeleton"/);
-  assert.match(preview, /baseColor="#eceae7"/);
-  assert.match(preview, /highlightColor="#f9f8f6"/);
-  assert.match(preview, /duration=\{2\.8\}/);
-  assert.match(preview, /sites-skeleton-search-placeholder/);
-  assert.match(packageJson, /"react-loading-skeleton": "3\.5\.0"/);
-
-  const shellIndex = preview.indexOf('className="sites-skeleton-shell"');
-  const statusIndex = preview.indexOf('className="sites-skeleton-status"');
-  assert.ok(shellIndex >= 0 && statusIndex > shellIndex);
-  assert.match(css, /position:\s*fixed/);
-  assert.match(css, /inset:\s*0/);
-  assert.match(css, /opacity:\s*0\.52/);
-  assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.doesNotMatch(css, /#020617|canvas|pets|progress/i);
-  assert.doesNotMatch(
-    preview,
-    /loading-spinner|status-mark|status-progress|canvas|cookie|random/i,
+test("uses sticker PNG production assets", async () => {
+  const assetIndex = await readFile(
+    new URL("../app/image-assets/index.ts", import.meta.url),
+    "utf8",
   );
-
-  assert.match(page, /export const metadata:\s*Metadata/);
-  assert.match(page, /"codex-preview": "development"/);
-  assert.match(page, /<SkeletonPreview \/>/);
-  assert.match(layout, /title:\s*"Starter Project"/);
-  assert.doesNotMatch(layout, /codex-preview|_sites-preview|themeColor|\bViewport\b/);
-  assert.doesNotMatch(css, /(^|\s)(html|body)\s*\{/m);
-
-  await assert.rejects(
-    access(new URL("public/_sites-preview", templateRoot)),
+  const milkTeaGame = await readFile(
+    new URL("../app/milk-tea-game.tsx", import.meta.url),
+    "utf8",
   );
+  const expectedAssets = [
+    "topping-sago",
+    "topping-mango",
+    "topping-coconut",
+    "topping-boba",
+    "topping-red-bean",
+    "topping-pudding",
+    "topping-grass-jelly",
+    "topping-taro-ball",
+    "topping-cheese-foam",
+    "topping-persimmon",
+    "scene-milk-tea-cup",
+    "scene-straw",
+  ];
+
+  for (const asset of expectedAssets) {
+    await access(new URL(`../public/generated-assets/${asset}.png`, import.meta.url));
+  }
+
+  assert.match(assetIndex, /kawaii hand-account sticker/);
+  assert.match(assetIndex, /fileName: "scene-milk-tea-cup\.png"/);
+  assert.match(assetIndex, /fileName: "scene-straw\.png"/);
+  assert.match(milkTeaGame, /PLAYER_SPEED_MULTIPLIER = 2/);
+  assert.match(milkTeaGame, /function makeStrawStabs/);
+  assert.match(milkTeaGame, /jabMs \* 3/);
 });

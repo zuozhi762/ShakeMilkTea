@@ -45,13 +45,13 @@ export type ImageAssetDefinition = {
 export const GENERATED_ASSET_BASE = "/generated-assets";
 
 export const REFERENCE_STYLE_PROFILE = {
-  name: "blueberry pastry package illustration",
-  source: "user-provided style reference",
+  name: "kawaii hand-account sticker illustration",
+  source: "current user direction",
   description:
-    "A polished editorial food illustration style with saturated cobalt blues, warm pastry golds, cream whites, hand-painted grain, crisp white outlines, subtle print texture, top-down product framing, and a playful premium snack-packaging feel.",
-  palette: ["#0f4c81", "#1d5f9f", "#f2a23a", "#fff4d5", "#6b3518", "#f7f1e0"],
+    "A refined kawaii scrapbook and hand-account sticker style with pastel colors, warm brown linework, thin white sticker borders, soft watercolor paper texture, clean anti-aliased edges, and small-game readability.",
+  palette: ["#ff9fbd", "#bfeeda", "#d9ccff", "#fffdf6", "#8a5b55", "#ffe38f"],
   constraints:
-    "No brand logos, no readable accidental text, no watermarks. Keep silhouettes clean enough for a small mobile game canvas.",
+    "No brand logos, no readable accidental text, no watermarks, no jagged edges. Keep silhouettes clean enough for a small mobile game canvas.",
 } as const;
 
 export const TOPPING_LEVELS = [
@@ -74,7 +74,7 @@ const toppingAssets: ImageAssetDefinition[] = TOPPING_LEVELS.map((level) => ({
   usage: `游戏内等级 ${level.level} 小料主体、进化路线图标、玩家主体兜底图`,
   fileName: `${level.assetId}.png`,
   status: "generated",
-  promptSubject: `${level.name} milk tea topping, readable as a shaped mobile-game collectible at small size, no circular badge backing`,
+  promptSubject: `${level.name} milk tea topping, refined kawaii hand-account sticker, readable as a shaped collectible at small size, no circular badge backing`,
   canvasRole: "ingredient",
 }));
 
@@ -121,9 +121,9 @@ export const IMAGE_ASSETS = [
     category: "scene",
     name: "奶茶杯",
     usage: "游戏主场景杯体外观",
-    fileName: "scene-milk-tea-cup.svg",
+    fileName: "scene-milk-tea-cup.png",
     status: "generated",
-    promptSubject: "a tall transparent milk tea cup seen from above at a slight angle, empty center for gameplay",
+    promptSubject: "a detailed transparent milk tea cup sticker, tall cup with cute hand-account style linework, empty center for gameplay",
     canvasRole: "cup",
   },
   {
@@ -140,9 +140,9 @@ export const IMAGE_ASSETS = [
     category: "scene",
     name: "吸管",
     usage: "吸管危险事件主体",
-    fileName: "scene-straw.svg",
+    fileName: "scene-straw.png",
     status: "generated",
-    promptSubject: "a pink-and-white striped straw game obstacle, angled, clean silhouette",
+    promptSubject: "a detailed pink-and-white striped straw sticker, angled game obstacle with rounded tip and clean silhouette",
     canvasRole: "straw",
   },
   {
@@ -191,8 +191,8 @@ export function buildImagePrompt(asset: ImageAssetDefinition) {
     `Input image: Image 1 is the visual style reference only.`,
     `Style/medium: ${REFERENCE_STYLE_PROFILE.description}`,
     `Composition/framing: centered isolated asset, generous padding, readable at 48px and polished at 256px.`,
-    `Color palette: cobalt blue accents, warm milk-tea caramel, pastry gold, cream white, dark cocoa linework.`,
-    `Materials/textures: hand-painted grain, screen-print speckles, crisp cream highlights, simple shadowless mobile-game silhouette.`,
+    `Color palette: pastel pink, mint, lavender, cream white, warm milk-tea caramel, soft brown linework.`,
+    `Materials/textures: watercolor paper texture, crisp cream highlights, thin white sticker border, simple shadowless mobile-game silhouette.`,
     `Constraints: ${REFERENCE_STYLE_PROFILE.constraints}`,
     `Avoid: photorealism, messy backgrounds, text, labels, brand marks, watermark, cropped edges.`,
   ].join("\n");

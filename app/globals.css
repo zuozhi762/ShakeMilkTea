@@ -1,14 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fff4cf;
-  --foreground: #42210f;
-  --milk: #f4bd6b;
-  --tea: #9d5c30;
-  --cream: #fff8e8;
-  --brown: #6a3518;
-  --pink: #ff7a9b;
-  --gold: #ffd86f;
+  --background: #fff7fb;
+  --foreground: #5a3b46;
+  --milk: #f8cfdc;
+  --tea: #d9b88f;
+  --cream: #fffdf6;
+  --brown: #8a5b55;
+  --pink: #ff9fbd;
+  --gold: #ffe38f;
+  --mint: #bfeeda;
+  --lavender: #d9ccff;
 }
 
 * {
@@ -24,9 +26,12 @@ body {
 
 body {
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.88), transparent 34rem),
-    radial-gradient(circle at 80% 20%, rgba(255, 122, 155, 0.28), transparent 26rem),
-    linear-gradient(135deg, #fff6d9 0%, #f2bb6e 48%, #965832 100%);
+    linear-gradient(90deg, rgba(255, 168, 194, 0.12) 1px, transparent 1px),
+    linear-gradient(rgba(158, 219, 199, 0.13) 1px, transparent 1px),
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.9), transparent 18rem),
+    radial-gradient(circle at 82% 24%, rgba(217, 204, 255, 0.36), transparent 24rem),
+    linear-gradient(135deg, #fff7fb 0%, #fff2d9 48%, #e9fff4 100%);
+  background-size: 28px 28px, 28px 28px, auto, auto, auto;
   color: var(--foreground);
   font-family: ui-rounded, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
 }
@@ -85,13 +90,13 @@ h1 {
   margin-bottom: 14px;
   font-size: clamp(38px, 6vw, 64px);
   line-height: 0.95;
-  letter-spacing: -0.06em;
+  letter-spacing: 0;
 }
 
 h2 {
   margin-bottom: 12px;
   font-size: 26px;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 
 .intro {
@@ -120,12 +125,14 @@ h2 {
   width: min(100%, 430px);
   margin: 0 auto;
   padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.76);
-  border-radius: 38px;
-  background: linear-gradient(160deg, rgba(255, 253, 245, 0.92), rgba(255, 222, 171, 0.72));
+  border: 3px solid rgba(255, 255, 255, 0.94);
+  border-radius: 34px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 242, 249, 0.86)),
+    repeating-linear-gradient(-8deg, rgba(255, 159, 189, 0.12) 0 10px, rgba(191, 238, 218, 0.12) 10px 20px);
   box-shadow:
-    0 30px 90px rgba(73, 31, 7, 0.3),
-    inset 0 0 0 8px rgba(255, 255, 255, 0.24);
+    0 22px 60px rgba(145, 94, 118, 0.22),
+    inset 0 0 0 7px rgba(255, 255, 255, 0.42);
   overflow: hidden;
 }
 
@@ -133,8 +140,8 @@ h2 {
   display: block;
   width: 100%;
   aspect-ratio: 390 / 700;
-  border-radius: 28px;
-  background: #df9956;
+  border-radius: 24px;
+  background: #ffe8f0;
   touch-action: none;
   user-select: none;
 }
@@ -148,7 +155,7 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  color: #51250f;
+  color: #654552;
   pointer-events: none;
 }
 
@@ -158,26 +165,28 @@ h2 {
 
 .bottom-hud {
   bottom: 25px;
+  border: 2px dashed rgba(255, 159, 189, 0.58);
   border-radius: 18px;
   padding: 10px 13px;
-  background: rgba(255, 248, 228, 0.72);
-  box-shadow: 0 10px 24px rgba(69, 30, 8, 0.14);
+  background: rgba(255, 253, 246, 0.82);
+  box-shadow: 0 10px 24px rgba(145, 94, 118, 0.13);
   font-size: 13px;
   font-weight: 800;
 }
 
 .hud > div {
   min-width: 0;
+  border: 2px solid rgba(255, 255, 255, 0.88);
   border-radius: 16px;
   padding: 8px 10px;
-  background: rgba(255, 248, 228, 0.78);
-  box-shadow: 0 10px 24px rgba(69, 30, 8, 0.12);
+  background: rgba(255, 253, 246, 0.82);
+  box-shadow: 0 10px 22px rgba(145, 94, 118, 0.12);
 }
 
 .hud small {
   display: block;
   margin-bottom: 2px;
-  color: rgba(81, 37, 15, 0.62);
+  color: rgba(101, 69, 82, 0.62);
   font-size: 10px;
   font-weight: 900;
 }
@@ -197,10 +206,13 @@ h2 {
   justify-content: center;
   gap: 12px;
   padding: 26px;
-  border-radius: 28px;
-  background: rgba(255, 248, 228, 0.88);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.66);
-  backdrop-filter: blur(10px);
+  border: 2px dashed rgba(255, 159, 189, 0.55);
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba(255, 253, 246, 0.94), rgba(255, 237, 246, 0.92)),
+    repeating-linear-gradient(0deg, rgba(191, 238, 218, 0.1) 0 11px, rgba(255, 255, 255, 0.1) 11px 22px);
+  box-shadow: inset 0 0 0 6px rgba(255, 255, 255, 0.46), 0 18px 48px rgba(145, 94, 118, 0.16);
+  backdrop-filter: blur(8px);
   text-align: center;
 }
 
@@ -209,50 +221,54 @@ h2 {
   height: 92px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
-  background: radial-gradient(circle at 30% 20%, #ffffff, #ffe2a8 44%, #ffae44 100%);
-  box-shadow: 0 18px 46px rgba(117, 60, 16, 0.26);
+  border: 4px solid #ffffff;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 35% 20%, #ffffff, #ffe1ec 44%, #ffd77d 100%);
+  box-shadow: 0 16px 34px rgba(145, 94, 118, 0.22);
   font-size: 54px;
+  transform: rotate(-4deg);
 }
 
 .overlay p {
   max-width: 290px;
-  color: rgba(66, 33, 15, 0.76);
+  color: rgba(90, 59, 70, 0.78);
   line-height: 1.6;
 }
 
 .overlay button,
 .button-row button {
   min-width: 132px;
-  border-radius: 999px;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  border-radius: 18px;
   padding: 12px 18px;
-  color: #4b230e;
-  background: linear-gradient(135deg, #ffe17d, #ff944d);
-  box-shadow: 0 14px 28px rgba(130, 65, 13, 0.22);
+  color: #5a3b46;
+  background: linear-gradient(135deg, #ffe38f, #ff9fbd);
+  box-shadow: 0 12px 24px rgba(145, 94, 118, 0.2);
   font-weight: 950;
 }
 
 .overlay button.secondary,
 .button-row button.secondary,
 .overlay button.ghost {
-  background: rgba(255, 255, 255, 0.7);
-  box-shadow: inset 0 0 0 1px rgba(98, 48, 16, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 0 0 2px rgba(191, 238, 218, 0.65);
 }
 
 .overlay button.ghost {
-  color: rgba(75, 35, 14, 0.75);
+  color: rgba(90, 59, 70, 0.75);
   box-shadow: none;
 }
 
 .result-overlay.win {
   background:
     radial-gradient(circle at 50% 17%, rgba(255, 255, 255, 0.9), transparent 9rem),
-    linear-gradient(150deg, rgba(255, 249, 210, 0.94), rgba(255, 183, 55, 0.92));
+    linear-gradient(150deg, rgba(255, 250, 218, 0.96), rgba(255, 159, 189, 0.72));
   animation: victoryGlow 1.1s ease-in-out infinite alternate;
 }
 
 .result-overlay.lose {
-  background: rgba(255, 241, 226, 0.92);
+  background: rgba(255, 244, 249, 0.94);
 }
 
 .reason {
@@ -271,16 +287,17 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 14px;
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.56);
+  background: rgba(255, 255, 255, 0.62);
 }
 
 .name-input {
   width: min(100%, 310px);
   display: grid;
   gap: 7px;
-  color: rgba(66, 33, 15, 0.7);
+  color: rgba(90, 59, 70, 0.7);
   font-size: 13px;
   font-weight: 900;
   text-align: left;
@@ -290,11 +307,12 @@ h2 {
   width: 100%;
   border: 0;
   outline: 0;
+  border: 2px solid rgba(255, 255, 255, 0.8);
   border-radius: 14px;
   padding: 11px 13px;
-  color: #4b230e;
+  color: #5a3b46;
   background: rgba(255, 255, 255, 0.8);
-  box-shadow: inset 0 0 0 1px rgba(98, 48, 16, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 159, 189, 0.28);
 }
 
 .button-row {
@@ -321,13 +339,14 @@ h2 {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 10px;
-  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.76);
+  border-radius: 14px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.62);
 }
 
 .rank {
-  color: #a35a26;
+  color: #e36f99;
   font-weight: 950;
 }
 
@@ -337,7 +356,7 @@ h2 {
 }
 
 .record-main small {
-  color: rgba(66, 33, 15, 0.62);
+  color: rgba(90, 59, 70, 0.62);
 }
 
 .side-panel h2 {
@@ -345,7 +364,7 @@ h2 {
 }
 
 .side-panel p {
-  color: rgba(66, 33, 15, 0.74);
+  color: rgba(90, 59, 70, 0.74);
   line-height: 1.65;
 }
 
@@ -360,21 +379,22 @@ h2 {
   grid-template-columns: 42px 1fr auto;
   align-items: center;
   gap: 9px;
-  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  border-radius: 14px;
   padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.44);
+  background: rgba(255, 255, 255, 0.5);
   transition: transform 0.2s ease, background 0.2s ease;
 }
 
 .evolution-list div.active {
   transform: scale(1.03);
-  background: rgba(255, 224, 122, 0.78);
-  box-shadow: 0 12px 30px rgba(107, 54, 14, 0.16);
+  background: rgba(255, 226, 239, 0.84);
+  box-shadow: 0 12px 30px rgba(145, 94, 118, 0.16);
 }
 
 .evolution-list small,
 .next-card small {
-  color: rgba(66, 33, 15, 0.58);
+  color: rgba(90, 59, 70, 0.58);
   font-weight: 900;
 }
 
@@ -394,7 +414,7 @@ h2 {
   }
 
   to {
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8), 0 0 80px rgba(255, 208, 60, 0.72);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8), 0 0 70px rgba(255, 159, 189, 0.58);
   }
 }
 
@@ -419,7 +439,7 @@ h2 {
     width: min(100%, calc(100dvh * 390 / 700));
     max-height: 100dvh;
     padding: 8px;
-    border-radius: 28px;
+    border-radius: 24px;
   }
 
   .overlay {
@@ -469,10 +489,10 @@ h2 {
 .asset-button::before {
   content: "";
   position: absolute;
-  inset: 4px 10px auto;
+  inset: 5px 12px auto;
   height: 42%;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.34);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.42);
   pointer-events: none;
 }
 
