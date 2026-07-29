@@ -47,13 +47,12 @@ button:disabled {
 }
 
 .game-shell {
-  width: min(1180px, 100%);
+  width: 100%;
   min-height: 100vh;
   margin: 0 auto;
-  padding: 28px clamp(14px, 3vw, 34px);
-  display: grid;
-  grid-template-columns: 1fr minmax(318px, 430px) 0.92fr;
-  gap: clamp(18px, 3vw, 34px);
+  padding: 18px;
+  display: flex;
+  justify-content: center;
   align-items: center;
 }
 
@@ -396,27 +395,6 @@ h2 {
 
   to {
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8), 0 0 80px rgba(255, 208, 60, 0.72);
-  }
-}
-
-@media (max-width: 980px) {
-  .game-shell {
-    grid-template-columns: 1fr;
-    align-items: start;
-  }
-
-  .hero-panel,
-  .side-panel {
-    width: min(100%, 560px);
-    margin: 0 auto;
-  }
-
-  .hero-panel {
-    padding-bottom: 22px;
-  }
-
-  .side-panel {
-    margin-bottom: 30px;
   }
 }
 
