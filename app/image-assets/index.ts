@@ -56,10 +56,10 @@ export const REFERENCE_STYLE_PROFILE = {
 
 export const TOPPING_LEVELS = [
   { level: 1, name: "\u897f\u7c73", emoji: "\u25cb", scale: 1.0, color: "#fff8e7", assetId: "topping-sago" },
-  { level: 2, name: "\u8292\u679c\u7c92", emoji: "\u25cf", scale: 1.15, color: "#ffd447", assetId: "topping-mango" },
+  { level: 2, name: "\u7ea2\u8c46", emoji: "\u25cf", scale: 1.15, color: "#9b2f2f", assetId: "topping-red-bean" },
   { level: 3, name: "\u6930\u679c\u7c92", emoji: "\u25c7", scale: 1.3, color: "#f8fafc", assetId: "topping-coconut" },
-  { level: 4, name: "\u73cd\u73e0", emoji: "\u25cf", scale: 1.45, color: "#211817", assetId: "topping-boba" },
-  { level: 5, name: "\u7ea2\u8c46", emoji: "\u25cf", scale: 1.6, color: "#9b2f2f", assetId: "topping-red-bean" },
+  { level: 4, name: "\u8292\u679c", emoji: "\u25cf", scale: 1.45, color: "#ffd447", assetId: "topping-mango" },
+  { level: 5, name: "\u73cd\u73e0", emoji: "\u25cf", scale: 1.6, color: "#211817", assetId: "topping-boba" },
   { level: 6, name: "\u5e03\u4e01", emoji: "\u25a0", scale: 1.8, color: "#f3b347", assetId: "topping-pudding" },
   { level: 7, name: "\u4ed9\u8349", emoji: "\u25a0", scale: 2.0, color: "#3f2925", assetId: "topping-grass-jelly" },
   { level: 8, name: "\u828b\u5706", emoji: "\u25cf", scale: 2.25, color: "#a26be8", assetId: "topping-taro-ball" },
