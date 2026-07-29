@@ -12,17 +12,13 @@ const CUP = { topY: 46, bottomY: 1188, topW: 575, bottomW: 405, centerX: WORLD_W
 const CUP_CENTER = { x: CUP.centerX, y: (CUP.topY + CUP.bottomY) / 2 };
 const LEADERBOARD_KEY = "shake_milk_tea_leaderboard";
 const EDGE_TOUCH_RATIO = 0.35;
-const PLAYER_SPEED_MULTIPLIER = 2;
-const TOUCH_STICK_TRAVEL = 82;
-const TOUCH_STICK_DEAD_ZONE = 7;
-const STRAW_FIRST_AT = 14000;
 const TXT = {
   defaultName: "\u533f\u540d\u5c0f\u6599",
-  defaultHint: "\u6309\u4f4f\u6ed1\u52a8\u63a7\u5236\u65b9\u5411\uff0c\u8ffd\u7740\u5c0f\u6599\u63a2\u7d22\u3002",
+  defaultHint: "\u955c\u5934\u53ea\u770b\u6574\u676f\u7ea6 1/3\uff0c\u8ffd\u7740\u5c0f\u6599\u63a2\u7d22\u3002",
   shakeWarn: "\u26a0\ufe0f \u5976\u8336\u8981\u88ab\u5927\u529b\u6447\u5566\uff01",
   shaking: "\u{1f9cb} \u5de6\u53f3\u72c2\u6447\uff01\u6574\u676f\u5c0f\u6599\u90fd\u7529\u8d77\u6765\u4e86\uff01",
-  strawWarn: "\u26a0\ufe0f \u5438\u7ba1\u8981\u4e09\u8fde\u6233\u4e0b\u6765\u4e86\uff0c\u770b\u51c6\u8d34\u7eb8\u5708\uff01",
-  strawActive: "\u{1f964} \u5438\u7ba1\u659c\u63d2\u8fdb\u6765\u5438\u5c0f\u6599\uff01\u522b\u88ab\u5438\u5230\uff01",
+  strawWarn: "\u26a0\ufe0f \u5438\u7ba1\u8981\u6765\u4e86\uff0c\u5feb\u8eb2\u5f00\u7ea2\u5708\uff01",
+  strawActive: "\u{1f964} \u5438\u7ba1\u6b63\u5728\u5438\uff01\u522b\u9760\u592a\u8fd1\uff01",
 };
 
 const LEVELS = TOPPING_LEVELS;
@@ -41,15 +37,11 @@ type Status = "menu" | "playing" | "won" | "lost" | "leaderboard";
 type EventKind = "idle" | "shakeWarning" | "shaking" | "strawWarning" | "strawActive";
 type Topping = { id: number; x: number; y: number; vx: number; vy: number; level: number; radius: number; spin: number };
 type Player = { x: number; y: number; vx: number; vy: number; level: number; progress: number; radius: number; carried: number[] };
-type StrawStab = { x: number; y: number; fromX: number; fromY: number };
-type ActiveEvent = { kind: EventKind; until: number; started: number; x?: number; y?: number; swing?: number; stabs?: StrawStab[]; jabMs?: number };
-type Runtime = { running: boolean; startTime: number; lastTime: number; elapsed: number; score: number; highestLevel: number; nextId: number; nextShakeAt: number; nextStrawAt: number; lastSpawnAt: number; lastHudAt: number; player: Player; toppings: Topping[]; target: { x: number; y: number; active: boolean }; joystick: { x: number; y: number; active: boolean }; keys: Set<string>; event: ActiveEvent; camera: { x: number; y: number }; shakeAngle: number; shakePower: number };
+type ActiveEvent = { kind: EventKind; until: number; started: number; x?: number; y?: number; swing?: number; period?: number };
+type Runtime = { running: boolean; startTime: number; lastTime: number; elapsed: number; score: number; highestLevel: number; nextId: number; nextShakeAt: number; lastSpawnAt: number; lastHudAt: number; player: Player; toppings: Topping[]; target: { x: number; y: number; active: boolean }; joystick: { x: number; y: number; power: number; active: boolean }; keys: Set<string>; event: ActiveEvent; camera: { x: number; y: number }; shakeAngle: number; shakePower: number };
 type Hud = { level: number; progress: number; score: number; elapsed: number; message: string };
 type ScoreRecord = { name: string; score: number; elapsed: number; highestLevel: number; result: "won" | "lost"; date: string };
 type FinalStats = Omit<ScoreRecord, "name" | "date"> & { reason: string };
-type TouchStick = { pointerId: number; anchorX: number; anchorY: number; lastX: number; lastY: number } | null;
-
-let worldCache: { canvas: HTMLCanvasElement; assetCount: number } | null = null;
 
 const levelInfo = (level: number) => LEVELS[Math.max(0, Math.min(LEVELS.length - 1, level - 1))];
 const radiusForLevel = (level: number) => 9 * levelInfo(level).scale;
@@ -79,7 +71,7 @@ function updateCamera(runtime: Runtime) { const viewW = WIDTH / VIEW_SCALE, view
 function createRuntime(): Runtime {
   const now = performance.now();
   const player: Player = { x: CUP.centerX, y: CUP.bottomY - 160, vx: 0, vy: 0, level: 1, progress: 1, radius: radiusForLevel(1), carried: Array(LEVELS.length + 1).fill(0) };
-  const runtime: Runtime = { running: true, startTime: now, lastTime: now, elapsed: 0, score: 0, highestLevel: 1, nextId: 1, nextShakeAt: 8000, nextStrawAt: STRAW_FIRST_AT, lastSpawnAt: 0, lastHudAt: 0, player, toppings: [], target: { x: player.x, y: player.y, active: false }, joystick: { x: 0, y: 0, active: false }, keys: new Set(), event: { kind: "idle", until: 0, started: now }, camera: { x: 0, y: 0 }, shakeAngle: 0, shakePower: 0 };
+  const runtime: Runtime = { running: true, startTime: now, lastTime: now, elapsed: 0, score: 0, highestLevel: 1, nextId: 1, nextShakeAt: 8000, lastSpawnAt: 0, lastHudAt: 0, player, toppings: [], target: { x: player.x, y: player.y, active: false }, joystick: { x: 0, y: 0, power: 0, active: false }, keys: new Set(), event: { kind: "idle", until: 0, started: now }, camera: { x: 0, y: 0 }, shakeAngle: 0, shakePower: 0 };
   updateCamera(runtime); addToppings(runtime, 10, 1); addToppings(runtime, 4, 2); addToppings(runtime, 2, 3); return runtime;
 }
 function addToppings(runtime: Runtime, count: number, forcedLevel?: number) { for (let i = 0; i < count; i += 1) { const level = forcedLevel ?? chooseSpawnLevel(runtime.player.level, runtime.elapsed), radius = radiusForLevel(level); let point = randomCupPoint(radius); for (let attempts = 0; attempts < 50; attempts += 1) { point = randomCupPoint(radius); if (dist(point, runtime.player) > runtime.player.radius + radius + 55) break; } runtime.toppings.push({ id: runtime.nextId, x: point.x, y: point.y, vx: rand(-52, 52), vy: rand(-52, 52), level, radius, spin: rand(0, Math.PI * 2) }); runtime.nextId += 1; } }
@@ -105,34 +97,11 @@ function normalizePlayerInventory(player: Player) {
 }
 function eventMessage(event: ActiveEvent) { if (event.kind === "shakeWarning") return TXT.shakeWarn; if (event.kind === "shaking") return TXT.shaking; if (event.kind === "strawWarning") return TXT.strawWarn; if (event.kind === "strawActive") return TXT.strawActive; return TXT.defaultHint; }
 function triggerShake(runtime: Runtime, now: number) { runtime.event = { kind: "shakeWarning", until: now + 800, started: now, swing: Math.random() > 0.5 ? 1 : -1 }; }
-function strawDifficulty(runtime: Runtime) { return clamp(runtime.elapsed / 150000 + Math.max(0, runtime.player.level - 1) / 20, 0, 1); }
-function strawWarningMs(runtime: Runtime) { return 1180 - strawDifficulty(runtime) * 520; }
-function strawJabMs(runtime: Runtime) { return 1280 - strawDifficulty(runtime) * 650; }
-function nextStrawDelay(runtime: Runtime) { return rand(17500 - strawDifficulty(runtime) * 6200, 25500 - strawDifficulty(runtime) * 8500); }
-function makeStrawStabs(runtime: Runtime): StrawStab[] {
-  const d = strawDifficulty(runtime);
-  return [0, 1, 2].map((index) => {
-    const y = CUP.topY + 210 + index * 245 + rand(-34, 54);
-    const radius = 44;
-    const b = cupBoundsAt(y, radius);
-    const x = rand(b.left + 20, b.right - 20);
-    const side = Math.random() > 0.5 ? 1 : -1;
-    return { x, y, fromX: clamp(x - side * (190 - d * 36), CUP.centerX - CUP.topW / 2 - 120, CUP.centerX + CUP.topW / 2 + 120), fromY: CUP.topY - 185 - index * 12 };
-  });
-}
-function triggerStraw(runtime: Runtime, now: number) { const stabs = makeStrawStabs(runtime); runtime.event = { kind: "strawWarning", until: now + strawWarningMs(runtime), started: now, stabs, jabMs: strawJabMs(runtime) }; }
-function currentStrawStab(runtime: Runtime, now: number) {
-  const stabs = runtime.event.stabs ?? [];
-  if (stabs.length === 0) return null;
-  const jabMs = runtime.event.jabMs ?? 960;
-  const elapsed = Math.max(0, now - runtime.event.started);
-  const index = Math.min(2, Math.floor(elapsed / jabMs));
-  const local = clamp((elapsed - index * jabMs) / jabMs, 0, 1);
-  const stab = stabs[index];
-  const plunge = local < 0.46 ? local / 0.46 : local < 0.7 ? 1 : 1 - (local - 0.7) / 0.3;
-  const eased = plunge < 0.5 ? 2 * plunge * plunge : 1 - Math.pow(-2 * plunge + 2, 2) / 2;
-  return { ...stab, index, local, x: stab.fromX + (stab.x - stab.fromX) * eased, y: stab.fromY + (stab.y - stab.fromY) * eased, activeSuction: local > 0.3 && local < 0.78 };
-}
+function triggerStraw(runtime: Runtime, now: number) { const p = randomCupPoint(28); p.y = rand(CUP.topY + 155, CUP.bottomY - 180); runtime.event = { kind: "strawWarning", until: now + 1050, started: now, x: p.x, y: p.y }; }
+function strawPeriod(runtime: Runtime) { return 760 - Math.min(runtime.elapsed / 150000, 1) * 300; }
+function strawTarget(runtime: Runtime, now: number) { const baseX = runtime.event.x ?? CUP.centerX, baseY = runtime.event.y ?? CUP.topY + 320, d = Math.min(runtime.elapsed / 160000, 1); const y = clamp(baseY + Math.cos(now / 430) * 42 * d, CUP.topY + 120, CUP.bottomY - 120); const b = cupBoundsAt(y, 42); return { x: clamp(baseX + Math.sin(now / 360) * 48 * (0.55 + d), b.left, b.right), y }; }
+function strawPhase(runtime: Runtime, now: number) { const period = runtime.event.period ?? strawPeriod(runtime); const elapsed = Math.max(0, now - runtime.event.started); return { period, strike: Math.floor(elapsed / period), phase: (elapsed % period) / period }; }
+function strawTip(runtime: Runtime, now: number) { const target = strawTarget(runtime, now), phase = strawPhase(runtime, now).phase; const thrust = phase < 0.38 ? phase / 0.38 : phase < 0.72 ? 1 : 1 - (phase - 0.72) / 0.28; const eased = clamp(thrust, 0, 1); return { x: target.x - 92 + 92 * eased, y: CUP.topY - 135 + (target.y - CUP.topY + 135) * eased, target, active: phase > 0.24 && phase < 0.76 }; }
 function keepInCup(item: { x: number; y: number; vx: number; vy: number; radius: number }) { const oldX = item.x, oldY = item.y; const p = clampPointToCup(item.x, item.y, item.radius); item.x = p.x; item.y = p.y; if (Math.abs(item.x - oldX) > 0.01) item.vx *= -0.72; if (Math.abs(item.y - oldY) > 0.01) item.vy *= -0.72; }
 function drawCupPath(ctx: CanvasRenderingContext2D, expand = 0) { const topHalf = CUP.topW / 2 + expand, bottomHalf = CUP.bottomW / 2 + expand; ctx.beginPath(); ctx.moveTo(CUP.centerX - topHalf, CUP.topY - expand); ctx.lineTo(CUP.centerX + topHalf, CUP.topY - expand); ctx.lineTo(CUP.centerX + bottomHalf, CUP.bottomY + expand); ctx.lineTo(CUP.centerX - bottomHalf, CUP.bottomY + expand); ctx.closePath(); }
 function drawAssetCentered(ctx: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, width: number, height: number, alpha = 1) {
@@ -152,20 +121,17 @@ function drawAssetBetween(ctx: CanvasRenderingContext2D, image: HTMLImageElement
 }
 function drawIngredient(ctx: CanvasRenderingContext2D, item: { x: number; y: number; radius: number; level: number }, isPlayer = false, assets: AssetImageMap = {}) {
   const lv = levelInfo(item.level); ctx.save(); ctx.translate(item.x, item.y);
+  ctx.fillStyle = isPlayer ? "rgba(255, 244, 166, 0.58)" : "rgba(255, 255, 255, 0.18)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + (isPlayer ? 9 : 3), 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = isPlayer ? "rgba(255, 255, 255, 0.92)" : "rgba(255, 255, 255, 0.68)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + 2, 0, Math.PI * 2); ctx.fill();
   const image = assetImage(assets, lv.assetId);
   if (image) {
-    const size = item.radius * 3.08;
-    if (isPlayer) {
-      ctx.shadowColor = "rgba(255, 243, 159, 0.95)";
-      ctx.shadowBlur = item.radius * 1.2;
-    }
+    const size = item.radius * 2.65;
     ctx.drawImage(image, -size / 2, -size / 2, size, size);
   } else {
-    ctx.fillStyle = isPlayer ? "rgba(255, 244, 166, 0.58)" : "rgba(255, 255, 255, 0.18)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + (isPlayer ? 9 : 3), 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = isPlayer ? "rgba(255, 255, 255, 0.92)" : "rgba(255, 255, 255, 0.68)"; ctx.beginPath(); ctx.arc(0, 0, item.radius + 2, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = lv.color; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI * 2); ctx.fill();
     ctx.font = Math.round(item.radius * 1.55) + "px Apple Color Emoji, Segoe UI Emoji, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(lv.emoji, 0, 1);
   }
+  if (isPlayer) { ctx.strokeStyle = "rgba(126, 60, 16, 0.9)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, item.radius + 5, 0, Math.PI * 2); ctx.stroke(); }
   ctx.restore();
 }
 function drawPlayerWithCarried(ctx: CanvasRenderingContext2D, runtime: Runtime, assets: AssetImageMap) {
@@ -174,40 +140,33 @@ function drawPlayerWithCarried(ctx: CanvasRenderingContext2D, runtime: Runtime, 
   const time = runtime.elapsed / 1000;
   pieces.forEach((level, index) => { if (level <= 0) return; const ring = Math.floor(index / 12), slot = index % 12; const angle = slot / 12 * Math.PI * 2 + ring * 0.38 + time * (0.8 + ring * 0.12); const orbit = player.radius + 8 + ring * 8.5 + Math.sin(time * 4.2 + index) * 2.2; const pieceRadius = clamp(radiusForLevel(level) * 0.44, 4.2, Math.max(5.2, player.radius * 0.44)); drawIngredient(ctx, { x: player.x + Math.cos(angle) * orbit, y: player.y + Math.sin(angle) * orbit, level, radius: pieceRadius }, false, assets); });
 }
-function drawWorldBackground(ctx: CanvasRenderingContext2D) {
-  const bg = ctx.createLinearGradient(0, 0, 0, WORLD_HEIGHT); bg.addColorStop(0, "#fff8ee"); bg.addColorStop(0.45, "#ffe5ef"); bg.addColorStop(1, "#dff9ed"); ctx.fillStyle = bg; ctx.fillRect(-200, -200, WORLD_WIDTH + 400, WORLD_HEIGHT + 400);
-  ctx.fillStyle = "rgba(255,255,255,0.42)"; for (let i = 0; i < 42; i += 1) { ctx.beginPath(); ctx.arc((i * 83) % WORLD_WIDTH, 42 + ((i * 131) % WORLD_HEIGHT), 2 + (i % 5), 0, Math.PI * 2); ctx.fill(); }
-  ctx.strokeStyle = "rgba(255,159,189,0.14)"; ctx.lineWidth = 3;
-  for (let line = 0; line < 8; line += 1) { ctx.beginPath(); const y = 110 + line * 145; for (let x = -40; x <= WORLD_WIDTH + 40; x += 36) { const wy = y + Math.sin((x + line * 41) / 31) * 8; if (x === -40) ctx.moveTo(x, wy); else ctx.lineTo(x, wy); } ctx.stroke(); }
-}
-function getWorldLayer(assets: AssetImageMap) {
-  const assetCount = Object.keys(assets).length;
-  if (worldCache?.assetCount === assetCount) return worldCache.canvas;
-  const canvas = document.createElement("canvas");
-  canvas.width = WORLD_WIDTH;
-  canvas.height = WORLD_HEIGHT;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return canvas;
-  drawWorldBackground(ctx);
-  drawCupPath(ctx, 12); ctx.fillStyle = "rgba(255,255,255,0.48)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.92)"; ctx.lineWidth = 8; ctx.stroke();
-  const cupImage = assetImage(assets, "scene-milk-tea-cup");
-  if (cupImage) drawAssetCentered(ctx, cupImage, CUP.centerX, CUP_CENTER.y, CUP.topW + 92, CUP.bottomY - CUP.topY + 118, 0.62);
-  drawCupPath(ctx); const tea = ctx.createLinearGradient(0, CUP.topY, 0, CUP.bottomY); tea.addColorStop(0, "rgba(255,238,206,0.82)"); tea.addColorStop(0.48, "rgba(232,184,139,0.84)"); tea.addColorStop(1, "rgba(197,145,117,0.86)"); ctx.fillStyle = tea; ctx.fill();
-  const teaSurface = assetImage(assets, "scene-tea-surface");
-  if (teaSurface) {
-    ctx.save(); drawCupPath(ctx); ctx.clip();
-    const pattern = ctx.createPattern(teaSurface, "repeat");
-    if (pattern) { ctx.globalAlpha = 0.24; ctx.fillStyle = pattern; ctx.fillRect(-280, CUP.topY - 80, WORLD_WIDTH + 560, CUP.bottomY - CUP.topY + 180); }
-    ctx.restore();
-  }
-  worldCache = { canvas, assetCount };
-  return canvas;
+function drawWorldBackground(ctx: CanvasRenderingContext2D, runtime: Runtime | null) {
+  const bg = ctx.createLinearGradient(0, 0, 0, WORLD_HEIGHT); bg.addColorStop(0, "#fff2c9"); bg.addColorStop(0.45, "#f0b967"); bg.addColorStop(1, "#98542d"); ctx.fillStyle = bg; ctx.fillRect(-200, -200, WORLD_WIDTH + 400, WORLD_HEIGHT + 400);
+  ctx.fillStyle = "rgba(255,255,255,0.18)"; for (let i = 0; i < 70; i += 1) { ctx.beginPath(); ctx.arc((i * 83) % WORLD_WIDTH, 42 + ((i * 131) % WORLD_HEIGHT), 2 + (i % 5), 0, Math.PI * 2); ctx.fill(); }
+  ctx.strokeStyle = "rgba(255,255,255,0.16)"; ctx.lineWidth = 3; const shift = runtime ? runtime.elapsed / 180 : 0;
+  for (let line = 0; line < 14; line += 1) { ctx.beginPath(); const y = 80 + line * 86; for (let x = -40; x <= WORLD_WIDTH + 40; x += 18) { const wy = y + Math.sin((x + shift + line * 41) / 31) * 8; if (x === -40) ctx.moveTo(x, wy); else ctx.lineTo(x, wy); } ctx.stroke(); }
 }
 function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, status: Status, assets: AssetImageMap = {}) {
-  ctx.clearRect(0, 0, WIDTH, HEIGHT); const screenBg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT); screenBg.addColorStop(0, "#fff8fb"); screenBg.addColorStop(0.55, "#ffe7f0"); screenBg.addColorStop(1, "#ddf8ed"); ctx.fillStyle = screenBg; ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.clearRect(0, 0, WIDTH, HEIGHT); const screenBg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT); screenBg.addColorStop(0, "#fff7da"); screenBg.addColorStop(1, "#a76538"); ctx.fillStyle = screenBg; ctx.fillRect(0, 0, WIDTH, HEIGHT);
   ctx.save(); if (runtime) { ctx.scale(VIEW_SCALE, VIEW_SCALE); ctx.translate(-runtime.camera.x, -runtime.camera.y); } else { ctx.translate((WIDTH - WORLD_WIDTH * 0.42) / 2, 35); ctx.scale(0.42, 0.42); }
   ctx.save(); if (runtime) { ctx.translate(CUP_CENTER.x, CUP_CENTER.y); ctx.rotate(runtime.shakeAngle); ctx.translate(-CUP_CENTER.x, -CUP_CENTER.y); }
-  ctx.drawImage(getWorldLayer(assets), 0, 0);
+  drawWorldBackground(ctx, runtime); drawCupPath(ctx, 12); ctx.fillStyle = "rgba(255,255,255,0.26)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.82)"; ctx.lineWidth = 7; ctx.stroke();
+  const cupImage = assetImage(assets, "scene-milk-tea-cup");
+  if (cupImage) drawAssetCentered(ctx, cupImage, CUP.centerX, CUP_CENTER.y, CUP.topW + 86, CUP.bottomY - CUP.topY + 110, 0.45);
+  drawCupPath(ctx); const tea = ctx.createLinearGradient(0, CUP.topY, 0, CUP.bottomY); tea.addColorStop(0, "rgba(255,219,147,0.76)"); tea.addColorStop(0.48, "rgba(188,113,56,0.86)"); tea.addColorStop(1, "rgba(103,54,30,0.92)"); ctx.fillStyle = tea; ctx.fill();
+  const teaSurface = assetImage(assets, "scene-tea-surface");
+  if (teaSurface) {
+    ctx.save();
+    drawCupPath(ctx); ctx.clip();
+    const pattern = ctx.createPattern(teaSurface, "repeat");
+    if (pattern) {
+      ctx.globalAlpha = 0.34;
+      ctx.translate(runtime ? runtime.elapsed / -90 : 0, runtime ? runtime.elapsed / 150 : 0);
+      ctx.fillStyle = pattern;
+      ctx.fillRect(-280, CUP.topY - 80, WORLD_WIDTH + 560, CUP.bottomY - CUP.topY + 180);
+    }
+    ctx.restore();
+  }
   ctx.save(); drawCupPath(ctx); ctx.clip();
   if (runtime) {
     if (runtime.event.kind === "shakeWarning" || runtime.event.kind === "shaking") {
@@ -220,49 +179,35 @@ function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, statu
       }
     }
     if (runtime.event.kind === "strawWarning" || runtime.event.kind === "strawActive") {
+      const now = performance.now(); const tip = runtime.event.kind === "strawActive" ? strawTip(runtime, now) : null; const c = tip?.target ?? { x: runtime.event.x ?? CUP.centerX, y: runtime.event.y ?? 320 };
       const ringImage = assetImage(assets, "effect-suction-ring");
-      const marks = runtime.event.kind === "strawActive" ? [currentStrawStab(runtime, performance.now())].filter(Boolean) : runtime.event.stabs ?? [];
-      marks.forEach((mark, index) => {
-        if (!mark) return;
-        const alpha = runtime.event.kind === "strawActive" ? 0.78 : 0.44 + index * 0.08;
-        if (ringImage) drawAssetCentered(ctx, ringImage, mark.x, mark.y, 138, 138, alpha);
-        else { ctx.fillStyle = runtime.event.kind === "strawActive" ? "rgba(255,105,137,0.13)" : "rgba(255,105,137,0.2)"; ctx.beginPath(); ctx.arc(mark.x, mark.y, 94, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "rgba(255,105,137,0.72)"; ctx.lineWidth = 4; ctx.setLineDash([10, 8]); ctx.beginPath(); ctx.arc(mark.x, mark.y, 54, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
-        if (runtime.event.kind === "strawActive") for (let ring = 0; ring < 4; ring += 1) { ctx.strokeStyle = "rgba(255,255,255," + (0.48 - ring * 0.07) + ")"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(mark.x, mark.y, 38 + ring * 31 + Math.sin(runtime.elapsed / 74 + ring) * 7, 0.15 + ring, Math.PI * 1.7 + ring); ctx.stroke(); }
-      });
+      if (ringImage) drawAssetCentered(ctx, ringImage, c.x, c.y, 142, 142, runtime.event.kind === "strawActive" ? 0.74 : 0.6);
+      else { ctx.fillStyle = runtime.event.kind === "strawActive" ? "rgba(255,52,88,0.16)" : "rgba(255,52,88,0.24)"; ctx.beginPath(); ctx.arc(c.x, c.y, 245, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "rgba(255,52,88,0.68)"; ctx.lineWidth = 4; ctx.setLineDash([12, 10]); ctx.beginPath(); ctx.arc(c.x, c.y, 62, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+      if (runtime.event.kind === "strawActive" && tip) { const phaseInfo = strawPhase(runtime, now); for (let ring = 0; ring < 4; ring += 1) { ctx.strokeStyle = "rgba(255,255,255," + (0.46 - ring * 0.07) + ")"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(tip.x, tip.y, 36 + ring * 32 + Math.sin(runtime.elapsed / 58 + ring) * 8, 0.2 + ring, Math.PI * 1.66 + ring); ctx.stroke(); } ctx.fillStyle = "rgba(255,255,255,0.86)"; ctx.font = "700 22px sans-serif"; ctx.textAlign = "center"; ctx.fillText(String(Math.min(3, phaseInfo.strike + 1)) + "/3", c.x, c.y - 78); }
     }
-    runtime.toppings.forEach((item) => drawIngredient(ctx, item, false, assets)); drawPlayerWithCarried(ctx, runtime, assets);
+    runtime.toppings.slice().sort((a, b) => a.level - b.level).forEach((item) => drawIngredient(ctx, item, false, assets)); drawPlayerWithCarried(ctx, runtime, assets);
     if (runtime.event.kind === "strawActive") {
-      const c = currentStrawStab(runtime, performance.now());
+      const tip = strawTip(runtime, performance.now());
       const strawImage = assetImage(assets, "scene-straw");
-      if (c && strawImage) drawAssetBetween(ctx, strawImage, { x: c.fromX, y: c.fromY }, c, 92, 118);
-      else if (c) { ctx.save(); ctx.lineCap = "round"; ctx.lineWidth = 24; ctx.strokeStyle = "#ff8fab"; ctx.beginPath(); ctx.moveTo(c.fromX, c.fromY); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.lineWidth = 8; ctx.strokeStyle = "rgba(255,255,255,0.92)"; ctx.setLineDash([22, 20]); ctx.beginPath(); ctx.moveTo(c.fromX, c.fromY); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.restore(); }
+      if (strawImage) drawAssetBetween(ctx, strawImage, { x: tip.target.x - 92, y: CUP.topY - 135 }, tip, 84, 88);
+      else { ctx.save(); ctx.lineCap = "round"; ctx.lineWidth = 22; ctx.strokeStyle = "#ff7b93"; ctx.beginPath(); ctx.moveTo(tip.target.x - 92, CUP.topY - 135); ctx.lineTo(tip.x, tip.y); ctx.stroke(); ctx.lineWidth = 8; ctx.strokeStyle = "rgba(255,255,255,0.92)"; ctx.setLineDash([22, 20]); ctx.beginPath(); ctx.moveTo(tip.target.x - 92, CUP.topY - 135); ctx.lineTo(tip.x, tip.y); ctx.stroke(); ctx.restore(); }
     }
   } else { const titleImage = assetImage(assets, "ui-title-badge"); if (titleImage) drawAssetCentered(ctx, titleImage, CUP.centerX, CUP_CENTER.y + 20, 210, 210, 0.9); else { ctx.font = "132px sans-serif"; ctx.textAlign = "center"; ctx.fillText("\u{1f9cb}", CUP.centerX, CUP_CENTER.y + 40); } }
-  ctx.restore(); ctx.restore(); ctx.restore(); ctx.fillStyle = "rgba(255,159,189,0.12)"; ctx.fillRect(0, HEIGHT - 28, WIDTH, 28); if (status !== "playing") { ctx.fillStyle = "rgba(90,59,70,0.13)"; ctx.fillRect(0, 0, WIDTH, HEIGHT); }
+  ctx.restore(); ctx.restore(); ctx.restore(); ctx.fillStyle = "rgba(77,39,20,0.18)"; ctx.fillRect(0, HEIGHT - 28, WIDTH, 28); if (status !== "playing") { ctx.fillStyle = "rgba(67,31,16,0.22)"; ctx.fillRect(0, 0, WIDTH, HEIGHT); }
 }
 function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (result: "won" | "lost", reason: string) => void) {
   runtime.elapsed = now - runtime.startTime; const player = runtime.player; const difficulty = Math.min(runtime.elapsed / 150000, 1), stage = difficultyStage(runtime.elapsed, player.level);
-  if (runtime.event.kind === "idle") { if (runtime.elapsed >= runtime.nextShakeAt) triggerShake(runtime, now); else if (runtime.elapsed >= runtime.nextStrawAt) triggerStraw(runtime, now); }
+  if (runtime.event.kind === "idle") { if (runtime.elapsed >= runtime.nextShakeAt) triggerShake(runtime, now); else if (runtime.elapsed >= 14000 + stage * 2500 && Math.random() < dt * (0.08 + difficulty * 0.22)) triggerStraw(runtime, now); }
   else if (runtime.event.kind === "shakeWarning" && now >= runtime.event.until) { runtime.event = { ...runtime.event, kind: "shaking", until: now + 1850, started: now }; runtime.shakePower = 1; }
   else if (runtime.event.kind === "shaking" && now >= runtime.event.until) { runtime.score += 100; runtime.event = { kind: "idle", until: 0, started: now }; runtime.nextShakeAt = runtime.elapsed + rand(11000 - difficulty * 3500, 19000 - difficulty * 4500); }
-  else if (runtime.event.kind === "strawWarning" && now >= runtime.event.until) { const jabMs = runtime.event.jabMs ?? 960; runtime.event = { ...runtime.event, kind: "strawActive", until: now + jabMs * 3, started: now }; }
-  else if (runtime.event.kind === "strawActive" && now >= runtime.event.until) { runtime.score += 260; runtime.event = { kind: "idle", until: 0, started: now }; runtime.nextStrawAt = runtime.elapsed + nextStrawDelay(runtime); }
-  const keyX = (runtime.keys.has("arrowright") || runtime.keys.has("d") ? 1 : 0) - (runtime.keys.has("arrowleft") || runtime.keys.has("a") ? 1 : 0); const keyY = (runtime.keys.has("arrowdown") || runtime.keys.has("s") ? 1 : 0) - (runtime.keys.has("arrowup") || runtime.keys.has("w") ? 1 : 0); let dirX = runtime.joystick.active ? runtime.joystick.x : keyX, dirY = runtime.joystick.active ? runtime.joystick.y : keyY;
-  if (runtime.joystick.active) {
-    const power = clamp(Math.hypot(dirX, dirY), 0, 1);
-    if (power > 0) { dirX /= power; dirY /= power; dirX *= power; dirY *= power; }
-  } else if (dirX === 0 && dirY === 0 && runtime.target.active) { const dx = runtime.target.x - player.x, dy = runtime.target.y - player.y, len = Math.hypot(dx, dy); if (len > 5) { dirX = dx / len; dirY = dy / len; } } else if (dirX || dirY) { const len = Math.hypot(dirX, dirY); dirX /= len; dirY /= len; }
-  const speedPenalty = (levelInfo(player.level).scale - 1) * 14, accel = 840 * PLAYER_SPEED_MULTIPLIER, maxSpeed = (205 - speedPenalty) * PLAYER_SPEED_MULTIPLIER; player.vx += dirX * accel * dt; player.vy += dirY * accel * dt; const pSpeed = Math.hypot(player.vx, player.vy); if (pSpeed > maxSpeed) { player.vx = player.vx / pSpeed * maxSpeed; player.vy = player.vy / pSpeed * maxSpeed; }
+  else if (runtime.event.kind === "strawWarning" && now >= runtime.event.until) { const period = strawPeriod(runtime); runtime.event = { ...runtime.event, kind: "strawActive", until: now + period * 3, started: now, period }; }
+  else if (runtime.event.kind === "strawActive" && now >= runtime.event.until) { runtime.score += 200; runtime.event = { kind: "idle", until: 0, started: now }; }
+  const keyX = (runtime.keys.has("arrowright") || runtime.keys.has("d") ? 1 : 0) - (runtime.keys.has("arrowleft") || runtime.keys.has("a") ? 1 : 0); const keyY = (runtime.keys.has("arrowdown") || runtime.keys.has("s") ? 1 : 0) - (runtime.keys.has("arrowup") || runtime.keys.has("w") ? 1 : 0); let dirX = keyX, dirY = keyY, inputPower = (keyX || keyY) ? 1 : 0;
+  if (runtime.joystick.active && inputPower === 0) { dirX = runtime.joystick.x; dirY = runtime.joystick.y; inputPower = runtime.joystick.power; }
+  if (dirX === 0 && dirY === 0 && runtime.target.active) { const dx = runtime.target.x - player.x, dy = runtime.target.y - player.y, len = Math.hypot(dx, dy); if (len > 4) { dirX = dx / len; dirY = dy / len; inputPower = clamp(len / 42, 0.2, 1); } } else if (dirX || dirY) { const len = Math.hypot(dirX, dirY); dirX /= len; dirY /= len; }
+  const speedPenalty = (levelInfo(player.level).scale - 1) * 15, accel = 1680, maxSpeed = 360 - speedPenalty; player.vx += dirX * accel * inputPower * dt; player.vy += dirY * accel * inputPower * dt; const pSpeed = Math.hypot(player.vx, player.vy), maxSpeedNow = maxSpeed * Math.max(0.28, inputPower || 0.28); if (pSpeed > maxSpeedNow) { player.vx = player.vx / pSpeed * maxSpeedNow; player.vy = player.vy / pSpeed * maxSpeedNow; }
   if (runtime.event.kind === "shaking") { const elapsed = now - runtime.event.started, direction = runtime.event.swing ?? 1, pulse = Math.sin(elapsed / 48), swing = direction * pulse; runtime.shakeAngle = swing * 0.18; runtime.shakePower = Math.max(0, 1 - elapsed / 2050); const shakeStrength = 560 + difficulty * 260, lateral = Math.cos(elapsed / 48) * direction; for (const item of [player, ...runtime.toppings]) { const dx = item.x - CUP_CENTER.x, dy = item.y - CUP_CENTER.y, len = Math.max(80, Math.hypot(dx, dy)); const tangentX = -dy / len, tangentY = dx / len, bottomBias = 0.65 + cupT(item.y) * 0.9; item.vx += (tangentX * shakeStrength * swing + lateral * shakeStrength * 0.95) * bottomBias * dt; item.vy += (tangentY * shakeStrength * swing + Math.sin(elapsed / 35) * 170) * bottomBias * dt; } } else { runtime.shakeAngle *= 0.82; runtime.shakePower *= 0.84; }
-  if (runtime.event.kind === "strawActive") {
-    const c = currentStrawStab(runtime, now);
-    if (c?.activeSuction) {
-      const dangerRadius = 42 + difficulty * 16 + stage * 4, pullRadius = 190 + difficulty * 58 + stage * 16, pull = 520 + difficulty * 310 + stage * 74, dPlayer = dist(player, c);
-      if (dPlayer < dangerRadius + player.radius * 0.55) { finish("lost", "\u4f60\u88ab\u5438\u7ba1\u5438\u8d70\u4e86"); return; }
-      if (dPlayer < pullRadius) { const power = (1 - dPlayer / pullRadius) * pull; player.vx += (c.x - player.x) / Math.max(1, dPlayer) * power * dt; player.vy += (c.y - player.y) / Math.max(1, dPlayer) * power * dt; }
-      runtime.toppings = runtime.toppings.filter((item) => { const d = dist(item, c); if (d < dangerRadius + item.radius * 0.34) return false; if (d < pullRadius) { const power = (1 - d / pullRadius) * pull * 1.08; item.vx += (c.x - item.x) / Math.max(1, d) * power * dt; item.vy += (c.y - item.y) / Math.max(1, d) * power * dt; } return true; });
-    }
-  }
+  if (runtime.event.kind === "strawActive") { const tip = strawTip(runtime, now), c = tip.target, dangerRadius = 43 + difficulty * 17 + stage * 4, pullRadius = 210 + difficulty * 54 + stage * 14, pull = 260 + difficulty * 185 + stage * 48, dPlayer = dist(player, tip); if (tip.active && dPlayer < dangerRadius + player.radius * 0.55) { finish("lost", "\u4f60\u88ab\u5438\u7ba1\u6233\u5230\u4e86"); return; } if (dPlayer < pullRadius) { const power = (1 - dPlayer / pullRadius) * pull; player.vx += (c.x - player.x) / Math.max(1, dPlayer) * power * dt; player.vy += (c.y - player.y) / Math.max(1, dPlayer) * power * dt; } runtime.toppings = runtime.toppings.filter((item) => { const d = dist(item, tip); if (tip.active && d < dangerRadius + item.radius * 0.3) return false; if (d < pullRadius) { const power = (1 - d / pullRadius) * pull * 0.95; item.vx += (c.x - item.x) / Math.max(1, d) * power * dt; item.vy += (c.y - item.y) / Math.max(1, d) * power * dt; } return true; }); }
   const damping = Math.pow(runtime.event.kind === "shaking" ? 0.965 : 0.91, dt * 60); player.vx *= damping; player.vy *= damping; player.x += player.vx * dt; player.y += player.vy * dt; keepInCup(player);
   for (const item of runtime.toppings) { const wander = 16 + item.level * 2.4; item.vx += Math.cos(now / 620 + item.spin) * wander * dt; item.vy += Math.sin(now / 760 + item.spin) * wander * dt; const maxItemSpeed = runtime.event.kind === "shaking" ? 360 + difficulty * 120 : 58 + item.level * 5 + difficulty * 24, speed = Math.hypot(item.vx, item.vy); if (speed > maxItemSpeed) { item.vx = item.vx / speed * maxItemSpeed; item.vy = item.vy / speed * maxItemSpeed; } item.x += item.vx * dt; item.y += item.vy * dt; keepInCup(item); }
   for (let i = runtime.toppings.length - 1; i >= 0; i -= 1) { const item = runtime.toppings[i]; if (!isInsideCup(item.x, item.y, item.radius)) continue; if (dist(player, item) < player.radius + item.radius * 0.72) { if (item.level > player.level) { finish("lost", "\u649e\u4e0a\u4e86\u66f4\u5927\u7684" + levelInfo(item.level).name); return; } runtime.toppings.splice(i, 1); const oldLevel = player.level; player.carried[item.level] = (player.carried[item.level] ?? 0) + 1; runtime.score += item.level === oldLevel ? item.level * 20 : item.level * 10; normalizePlayerInventory(player); if (player.level > oldLevel) { for (let level = oldLevel + 1; level <= player.level; level += 1) runtime.score += level * 100; runtime.highestLevel = Math.max(runtime.highestLevel, player.level); player.vx *= 0.45; player.vy *= 0.45; if (player.level >= 10) { runtime.score += 3000; finish("won", "\u4f60\u5408\u6210\u4e86\u4f20\u8bf4\u4e2d\u7684\u67ff\u5b50"); return; } } } }
@@ -271,7 +216,7 @@ function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (resul
 }
 
 export function MilkTeaGame() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null); const touchStickRef = useRef<TouchStick>(null); const runtimeRef = useRef<Runtime | null>(null); const assetImagesRef = useRef<AssetImageMap>({}); const [assetRevision, setAssetRevision] = useState(0); const [status, setStatus] = useState<Status>("menu"); const [hud, setHud] = useState<Hud>({ level: 1, progress: 1, score: 0, elapsed: 0, message: TXT.defaultHint }); const [finalStats, setFinalStats] = useState<FinalStats | null>(null); const [leaderboard, setLeaderboard] = useState<ScoreRecord[]>([]); const [playerName, setPlayerName] = useState(TXT.defaultName); const [saved, setSaved] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null); const runtimeRef = useRef<Runtime | null>(null); const assetImagesRef = useRef<AssetImageMap>({}); const [assetRevision, setAssetRevision] = useState(0); const [status, setStatus] = useState<Status>("menu"); const [hud, setHud] = useState<Hud>({ level: 1, progress: 1, score: 0, elapsed: 0, message: TXT.defaultHint }); const [finalStats, setFinalStats] = useState<FinalStats | null>(null); const [leaderboard, setLeaderboard] = useState<ScoreRecord[]>([]); const [playerName, setPlayerName] = useState(TXT.defaultName); const [saved, setSaved] = useState(false);
   const updateTargetFromClient = (clientX: number, clientY: number) => { const canvas = canvasRef.current, runtime = runtimeRef.current; if (!canvas || !runtime || !runtime.running) return; const rect = canvas.getBoundingClientRect(); let x = ((clientX - rect.left) / rect.width) * WIDTH / VIEW_SCALE + runtime.camera.x; let y = ((clientY - rect.top) / rect.height) * HEIGHT / VIEW_SCALE + runtime.camera.y; if (Math.abs(runtime.shakeAngle) > 0.001) { const dx = x - CUP_CENTER.x, dy = y - CUP_CENTER.y, c = Math.cos(-runtime.shakeAngle), s = Math.sin(-runtime.shakeAngle); x = CUP_CENTER.x + dx * c - dy * s; y = CUP_CENTER.y + dx * s + dy * c; } runtime.target = { x, y, active: true }; };
   useEffect(() => {
     let disposed = false;
@@ -290,59 +235,30 @@ export function MilkTeaGame() {
   }, []);
   useEffect(() => { setLeaderboard(loadLeaderboard()); }, []);
   useEffect(() => { const down = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k)) { e.preventDefault(); runtimeRef.current?.keys.add(k); } }; const up = (e: KeyboardEvent) => runtimeRef.current?.keys.delete(e.key.toLowerCase()); window.addEventListener("keydown", down); window.addEventListener("keyup", up); return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); }; }, []);
-  useEffect(() => { if (status !== "playing") return; const movePointer = (event: PointerEvent) => { if (event.pointerType === "mouse") updateTargetFromClient(event.clientX, event.clientY); }; window.addEventListener("pointermove", movePointer); return () => window.removeEventListener("pointermove", movePointer); }, [status]);
-  useEffect(() => { const canvas = canvasRef.current, ctx = canvas?.getContext("2d"); if (!ctx || !canvas) return; let frame = 0; const finish = (result: "won" | "lost", reason: string) => { const runtime = runtimeRef.current; if (!runtime || !runtime.running) return; runtime.running = false; setFinalStats({ result, reason, score: runtime.score, elapsed: runtime.elapsed, highestLevel: runtime.highestLevel }); setSaved(false); setStatus(result); }; const loop = (now: number) => { const runtime = runtimeRef.current; if (!runtime || !runtime.running) return; const dt = Math.min(0.033, Math.max(0.001, (now - runtime.lastTime) / 1000)); runtime.lastTime = now; updateRuntime(runtime, dt, now, finish); drawScene(ctx, runtime, "playing", assetImagesRef.current); if (now - runtime.lastHudAt > 180) { runtime.lastHudAt = now; setHud({ level: runtime.player.level, progress: runtime.player.progress, score: runtime.score, elapsed: runtime.elapsed, message: eventMessage(runtime.event) }); } frame = window.requestAnimationFrame(loop); }; if (status === "playing") frame = window.requestAnimationFrame(loop); else drawScene(ctx, runtimeRef.current, status, assetImagesRef.current); return () => window.cancelAnimationFrame(frame); }, [status, assetRevision]);
+  useEffect(() => { if (status !== "playing") return; const movePointer = (event: PointerEvent) => updateTargetFromClient(event.clientX, event.clientY); const moveMouse = (event: MouseEvent) => updateTargetFromClient(event.clientX, event.clientY); window.addEventListener("pointermove", movePointer); window.addEventListener("mousemove", moveMouse); return () => { window.removeEventListener("pointermove", movePointer); window.removeEventListener("mousemove", moveMouse); }; }, [status]);
+  useEffect(() => { const canvas = canvasRef.current, ctx = canvas?.getContext("2d"); if (!ctx || !canvas) return; let frame = 0; const finish = (result: "won" | "lost", reason: string) => { const runtime = runtimeRef.current; if (!runtime || !runtime.running) return; runtime.running = false; setFinalStats({ result, reason, score: runtime.score, elapsed: runtime.elapsed, highestLevel: runtime.highestLevel }); setSaved(false); setStatus(result); }; const loop = (now: number) => { const runtime = runtimeRef.current; if (!runtime || !runtime.running) return; const dt = Math.min(0.033, Math.max(0.001, (now - runtime.lastTime) / 1000)); runtime.lastTime = now; updateRuntime(runtime, dt, now, finish); drawScene(ctx, runtime, "playing", assetImagesRef.current); if (now - runtime.lastHudAt > 100) { runtime.lastHudAt = now; setHud({ level: runtime.player.level, progress: runtime.player.progress, score: runtime.score, elapsed: runtime.elapsed, message: eventMessage(runtime.event) }); } frame = window.requestAnimationFrame(loop); }; if (status === "playing") frame = window.requestAnimationFrame(loop); else drawScene(ctx, runtimeRef.current, status, assetImagesRef.current); return () => window.cancelAnimationFrame(frame); }, [status, assetRevision]);
   const startGame = () => { const runtime = createRuntime(); runtimeRef.current = runtime; setFinalStats(null); setSaved(false); setHud({ level: 1, progress: 1, score: 0, elapsed: 0, message: TXT.defaultHint }); setStatus("playing"); };
   const openLeaderboard = () => { setLeaderboard(loadLeaderboard()); setStatus("leaderboard"); };
-  const handlePointer = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const runtime = runtimeRef.current;
-    if (!runtime?.running) return;
-    if (event.pointerType !== "touch") {
-      if (event.type === "pointerdown") event.currentTarget.setPointerCapture(event.pointerId);
-      updateTargetFromClient(event.clientX, event.clientY);
-      return;
-    }
-    event.preventDefault();
-    if (event.type === "pointerdown") {
-      event.currentTarget.setPointerCapture(event.pointerId);
-      touchStickRef.current = { pointerId: event.pointerId, anchorX: event.clientX, anchorY: event.clientY, lastX: event.clientX, lastY: event.clientY };
-    }
-    const stick = touchStickRef.current;
-    if (!stick || stick.pointerId !== event.pointerId) return;
-    const dx = event.clientX - stick.anchorX, dy = event.clientY - stick.anchorY, distance = Math.hypot(dx, dy);
-    runtime.target.active = false;
-    if (distance > TOUCH_STICK_TRAVEL) {
-      const keepX = dx / distance * TOUCH_STICK_TRAVEL;
-      const keepY = dy / distance * TOUCH_STICK_TRAVEL;
-      stick.anchorX = event.clientX - keepX;
-      stick.anchorY = event.clientY - keepY;
-    }
-    stick.lastX = event.clientX;
-    stick.lastY = event.clientY;
-    const power = clamp((distance - TOUCH_STICK_DEAD_ZONE) / (TOUCH_STICK_TRAVEL - TOUCH_STICK_DEAD_ZONE), 0, 1);
-    runtime.joystick = power <= 0 ? { x: 0, y: 0, active: true } : { x: dx / distance * power, y: dy / distance * power, active: true };
-  };
-  const stopPointer = (event?: React.PointerEvent<HTMLCanvasElement>) => {
-    const runtime = runtimeRef.current;
-    if (!runtime) return;
-    if (event?.pointerType === "touch") {
-      if (touchStickRef.current?.pointerId !== event.pointerId) return;
-      touchStickRef.current = null;
-      runtime.joystick = { x: 0, y: 0, active: false };
-    } else runtime.target.active = false;
-  };
+  const handlePointer = (event: React.PointerEvent<HTMLCanvasElement>) => { if (event.pointerType === "touch") return; if (event.type === "pointerdown") event.currentTarget.setPointerCapture(event.pointerId); updateTargetFromClient(event.clientX, event.clientY); };
+  const stopPointer = () => { if (runtimeRef.current) runtimeRef.current.target.active = false; };
   const persistScore = () => { if (!finalStats || saved) return; const next = saveLeaderboard({ name: (playerName.trim() || TXT.defaultName).slice(0, 12), score: finalStats.score, elapsed: finalStats.elapsed, highestLevel: finalStats.highestLevel, result: finalStats.result, date: new Date().toLocaleString("zh-CN") }); setLeaderboard(next); setSaved(true); };
-  const current = levelInfo(hud.level), finalLevelName = finalStats ? levelInfo(finalStats.highestLevel).name : current.name;
-  const menuBadgeUrl = assetUrl("scene-milk-tea-cup");
-  const victoryBurstUrl = assetUrl("topping-persimmon");
+  const current = levelInfo(hud.level), next = hud.level < 10 ? levelInfo(hud.level + 1) : null, finalLevelName = finalStats ? levelInfo(finalStats.highestLevel).name : current.name;
+  const joystickRef = useRef<HTMLDivElement | null>(null);
+  const [joystick, setJoystick] = useState({ active: false, knobX: 0, knobY: 0 });
+  const updateJoystick = (event: React.PointerEvent<HTMLDivElement>) => { const runtime = runtimeRef.current, node = joystickRef.current; if (!runtime || !node || !runtime.running) return; const rect = node.getBoundingClientRect(); const centerX = rect.left + rect.width / 2, centerY = rect.top + rect.height / 2, limit = rect.width * 0.36; const rawX = event.clientX - centerX, rawY = event.clientY - centerY, length = Math.hypot(rawX, rawY), power = clamp(length / limit, 0, 1); const unitX = length > 0 ? rawX / length : 0, unitY = length > 0 ? rawY / length : 0; runtime.joystick = { x: unitX, y: unitY, power, active: true }; runtime.target.active = false; setJoystick({ active: true, knobX: unitX * power * 28, knobY: unitY * power * 28 }); };
+  const stopJoystick = () => { if (runtimeRef.current) runtimeRef.current.joystick = { x: 0, y: 0, power: 0, active: false }; setJoystick({ active: false, knobX: 0, knobY: 0 }); };
+  const menuBadgeUrl = assetUrl("ui-title-badge");
+  const victoryBurstUrl = assetUrl("ui-victory-burst");
   const strawUrl = assetUrl("scene-straw");
   const currentAssetUrl = assetUrl(current.assetId);
+  const nextAssetUrl = next ? assetUrl(next.assetId) : null;
   return (
-    <main className="game-shell">
+    <main className="game-shell" aria-label="\u6447\u6447\u5976\u8336\u5927\u5408\u6210\u6e38\u620f">
       <section className="phone-frame" aria-label="game area"><div className="hud top-hud"><div><small>{"\u5f53\u524d"}</small><strong>{currentAssetUrl ? <img className="hud-icon" src={currentAssetUrl} alt="" /> : current.emoji} {current.name}</strong></div><div><small>{"\u8fdb\u5ea6"}</small><strong>{hud.progress}/3</strong></div><div><small>{"\u65f6\u95f4"}</small><strong>{formatTime(hud.elapsed)}</strong></div></div><canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="game-canvas" onPointerDown={handlePointer} onPointerMove={handlePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer} aria-label="game canvas" /><div className="hud bottom-hud"><span>{hud.message}</span><b>{hud.score} {"\u5206"}</b></div>
-        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u{1f9cb}"}</div><h2>{"\u51c6\u5907\u5f00\u6447\uff01"}</h2><p>{"\u7535\u8111\u7aef\u7528\u9f20\u6807\u6216 WASD\uff1b\u624b\u673a\u7aef\u50cf\u53ec\u5524\u795e\u9f99\u4e00\u6837\u6309\u4f4f\u5c4f\u5e55\u6ed1\u52a8\uff0c\u7528\u6ed1\u52a8\u65b9\u5411\u63a7\u5236\u6e38\u52a8\u3002\u5438\u7ba1\u4f1a\u4e09\u8fde\u659c\u63d2\uff0c\u522b\u88ab\u5438\u8d70\u3002"}</p><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={openLeaderboard}>{"\u67e5\u770b\u6392\u884c\u699c"}</button></div>}
-        {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" && victoryBurstUrl ? <img src={victoryBurstUrl} alt="" /> : status === "lost" && strawUrl ? <img src={strawUrl} alt="" /> : status === "won" ? "\u{1f7e0}" : "\u{1f964}"}</div><h2>{status === "won" ? "\u8d85\u7ea7\u65e0\u654c\u597d\u559d\u5730\u80dc\u5229\uff01" : "\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h2><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row"><button onClick={persistScore} disabled={saved}>{saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9"}</button><button className="secondary" onClick={startGame}>{"\u518d\u6765\u4e00\u5c40"}</button></div><button className="ghost" onClick={openLeaderboard}>{"\u770b\u6392\u884c\u699c"}</button></div>}
-        {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u672c\u5730\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row"><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={() => setStatus("menu")}>{"\u8fd4\u56de\u9996\u9875"}</button></div></div>}
+        {status === "playing" && <div ref={joystickRef} className={"joystick" + (joystick.active ? " active" : "")} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); updateJoystick(event); }} onPointerMove={updateJoystick} onPointerUp={stopJoystick} onPointerCancel={stopJoystick} aria-label="virtual joystick"><span style={{ transform: `translate(${joystick.knobX}px, ${joystick.knobY}px)` }} /></div>}
+        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u25cb"}</div><h1>{"\u6447\u6447\u5976\u8336\u5927\u5408\u6210"}</h1><p>{"PC \u4f7f\u7528\u9f20\u6807\u6216 WASD\uff0c\u624b\u673a\u4f7f\u7528\u5de6\u4e0b\u6447\u6746\u3002\u5408\u6210\u5c0f\u6599\uff0c\u8eb2\u5f00\u8fde\u7eed\u6233\u4e0b\u6765\u7684\u5438\u7ba1\u3002"}</p><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={openLeaderboard}>{"\u6392\u884c\u699c"}</button></div>}
+        {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" && victoryBurstUrl ? <img src={victoryBurstUrl} alt="" /> : status === "lost" && strawUrl ? <img src={strawUrl} alt="" /> : status === "won" ? "\u25cb" : "|"}</div><h2>{status === "won" ? "\u8d85\u7ea7\u65e0\u654c\u597d\u559d\u5730\u80dc\u5229\uff01" : "\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h2><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row"><button onClick={persistScore} disabled={saved}>{saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9"}</button><button className="secondary" onClick={startGame}>{"\u518d\u6765\u4e00\u5c40"}</button></div><button className="ghost" onClick={openLeaderboard}>{"\u770b\u6392\u884c\u699c"}</button></div>}
+        {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u672c\u5730\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row"><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={() => setStatus("menu")}>{"\u8fd4\u56de"}</button></div></div>}
       </section>
     </main>
   );
