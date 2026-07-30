@@ -811,3 +811,37 @@ h2 {
   top: 30px;
   margin-bottom: 34px;
 }
+
+.image-button,
+.overlay .image-button,
+.button-row .image-button {
+  --button-offset-y: 0px;
+  transform: translateY(var(--button-offset-y));
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.image-button:active {
+  transform: translateY(calc(var(--button-offset-y) + 3px)) scale(.985);
+}
+
+.image-button.clicked {
+  animation: button-pop 180ms ease-out;
+}
+
+@keyframes button-pop {
+  0% { transform: translateY(var(--button-offset-y)) scale(1); }
+  45% { transform: translateY(calc(var(--button-offset-y) - 4px)) scale(1.055); }
+  100% { transform: translateY(var(--button-offset-y)) scale(1); }
+}
+
+.menu-overlay .logo-bubble {
+  transform: translateY(-30px);
+}
+
+.menu-overlay > .image-button {
+  --button-offset-y: -70px;
+}
+
+.menu-overlay > .image-button.secondary {
+  --button-offset-y: -90px;
+}

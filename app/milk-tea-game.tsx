@@ -178,32 +178,26 @@ function drawAssetBetween(ctx: CanvasRenderingContext2D, image: HTMLImageElement
   ctx.restore();
 }
 function drawStrawDangerRect(ctx: CanvasRenderingContext2D, stab: StrawStab, active: boolean, alpha: number) {
-  const dx = stab.x - stab.fromX, dy = stab.y - stab.fromY, length = Math.hypot(dx, dy) + 110, width = active ? 104 : 92;
+  const dx = stab.x - stab.fromX, dy = stab.y - stab.fromY, length = Math.hypot(dx, dy) + 120, width = active ? 108 : 96;
   ctx.save();
   ctx.translate((stab.fromX + stab.x) / 2, (stab.fromY + stab.y) / 2);
   ctx.rotate(Math.atan2(dy, dx) - Math.PI / 2);
-  ctx.fillStyle = active ? "rgba(255,52,88," + (0.18 * alpha) + ")" : "rgba(255,52,88," + (0.16 * alpha) + ")";
-  ctx.strokeStyle = active ? "rgba(255,255,255," + (0.68 * alpha) + ")" : "rgba(255,52,88," + (0.9 * alpha) + ")";
-  ctx.lineWidth = active ? 6 : 5;
-  ctx.setLineDash(active ? [22, 12] : [14, 9]);
+  ctx.fillStyle = active ? "rgba(255,52,88," + (0.2 * alpha) + ")" : "rgba(255,52,88," + (0.14 * alpha) + ")";
+  ctx.strokeStyle = active ? "rgba(255,255,255," + (0.72 * alpha) + ")" : "rgba(255,52,88," + (0.92 * alpha) + ")";
+  ctx.lineWidth = active ? 7 : 5;
+  ctx.setLineDash(active ? [24, 10] : [14, 9]);
   ctx.beginPath();
   ctx.roundRect(-width / 2, -length / 2, width, length, 18);
   ctx.fill();
   ctx.stroke();
   ctx.restore();
-
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.strokeStyle = active ? "rgba(255,64,88,0.94)" : "rgba(255,64,88,0.84)";
-  ctx.fillStyle = active ? "rgba(255,86,104,0.16)" : "rgba(255,222,86,0.2)";
-  ctx.lineWidth = active ? 6 : 5;
-  ctx.setLineDash(active ? [] : [10, 8]);
-  ctx.beginPath();
-  ctx.arc(stab.x, stab.y, active ? 64 : 76, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.restore();
+}
+function pointInStrawRect(point: { x: number; y: number; radius: number }, stab: StrawStab, halfWidth: number) {
+  const dx = stab.x - stab.fromX, dy = stab.y - stab.fromY, length = Math.max(1, Math.hypot(dx, dy));
+  const ux = dx / length, uy = dy / length;
+  const px = point.x - stab.fromX, py = point.y - stab.fromY;
+  const along = px * ux + py * uy, cross = Math.abs(px * -uy + py * ux);
+  return along >= -64 - point.radius && along <= length + 64 + point.radius && cross <= halfWidth + point.radius * 0.45;
 }
 function drawStrawOverlay(ctx: CanvasRenderingContext2D, runtime: Runtime, assets: AssetImageMap) {
   if (runtime.event.kind !== "strawActive") return;
@@ -287,7 +281,7 @@ function drawWorldBackground(ctx: CanvasRenderingContext2D, runtime: Runtime | n
 function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, status: Status, assets: AssetImageMap = {}) {
   ctx.clearRect(0, 0, WIDTH, HEIGHT); const screenBg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT); screenBg.addColorStop(0, "#fffaf0"); screenBg.addColorStop(1, "#f7d7bd"); ctx.fillStyle = screenBg; ctx.fillRect(0, 0, WIDTH, HEIGHT);
   ctx.save(); if (runtime) { ctx.scale(VIEW_SCALE, VIEW_SCALE); ctx.translate(-runtime.camera.x, -runtime.camera.y); } else { ctx.translate((WIDTH - WORLD_WIDTH * 0.42) / 2, 35); ctx.scale(0.42, 0.42); }
-  ctx.save(); if (runtime) { const cupSwingX = Math.sin(runtime.elapsed / 20) * runtime.shakePower * 70; ctx.translate(CUP_CENTER.x + cupSwingX, CUP_CENTER.y); ctx.rotate(runtime.shakeAngle); ctx.translate(-CUP_CENTER.x, -CUP_CENTER.y); }
+  ctx.save(); if (runtime) { ctx.translate(CUP_CENTER.x, CUP_CENTER.y); ctx.rotate(runtime.shakeAngle); ctx.translate(-CUP_CENTER.x, -CUP_CENTER.y); }
   drawWorldBackground(ctx, runtime); drawCupPath(ctx, 12); ctx.fillStyle = "rgba(255,255,255,0.26)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.82)"; ctx.lineWidth = 7; ctx.stroke();
   const cupImage = assetImage(assets, "scene-milk-tea-cup");
   if (cupImage) drawAssetCentered(ctx, cupImage, CUP.centerX, CUP_CENTER.y, CUP.topW + 90, CUP.bottomY - CUP.topY + 118, 0.5);
@@ -339,7 +333,7 @@ function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (resul
   else if (runtime.event.kind === "strawActive" && now >= runtime.event.until) { runtime.score += 200; runtime.event = { kind: "idle", until: 0, started: now }; }
   const keyX = (runtime.keys.has("arrowright") || runtime.keys.has("d") ? 1 : 0) - (runtime.keys.has("arrowleft") || runtime.keys.has("a") ? 1 : 0); const keyY = (runtime.keys.has("arrowdown") || runtime.keys.has("s") ? 1 : 0) - (runtime.keys.has("arrowup") || runtime.keys.has("w") ? 1 : 0); let dirX = keyX, dirY = keyY, inputPower = (keyX || keyY) ? 1 : 0;
   if (runtime.joystick.active && inputPower === 0) { dirX = runtime.joystick.x; dirY = runtime.joystick.y; inputPower = runtime.joystick.power; }
-  const speedPenalty = (levelInfo(player.level).scale - 1) * 10, maxSpeed = 144 - speedPenalty;
+  const speedPenalty = (levelInfo(player.level).scale - 1) * 10, maxSpeed = 166 - speedPenalty;
   let targetVx = 0, targetVy = 0, velocityEase = 1;
   if (dirX === 0 && dirY === 0 && runtime.pointer.active) {
     const pointerEase = 1 - Math.exp(-dt * 18);
@@ -354,8 +348,8 @@ function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (resul
   }
   const controlVx = runtime.event.kind === "shaking" ? targetVx * 0.23 : targetVx, controlVy = runtime.event.kind === "shaking" ? targetVy * 0.23 : targetVy;
   player.vx += (controlVx - player.vx) * velocityEase; player.vy += (controlVy - player.vy) * velocityEase;
-  if (runtime.event.kind === "shaking") { const elapsed = now - runtime.event.started, direction = runtime.event.swing ?? 1, pulse = Math.sin(elapsed / 21), swing = direction * pulse; runtime.shakeAngle = swing * (0.82 + difficulty * 0.18); runtime.shakePower = Math.max(0, 1 - elapsed / Math.max(2100, runtime.event.until - runtime.event.started)); const shakeStrength = 2250 + difficulty * 1680 + stage * 240, lateral = Math.cos(elapsed / 21) * direction; for (const item of [player, ...runtime.toppings]) { const dx = item.x - CUP_CENTER.x, dy = item.y - CUP_CENTER.y, len = Math.max(80, Math.hypot(dx, dy)); const tangentX = -dy / len, tangentY = dx / len, bottomBias = 0.65 + cupT(item.y) * 0.9, shakeWeight = item === player ? 0.7 : 1; item.vx += (tangentX * shakeStrength * swing + lateral * shakeStrength * 0.95) * bottomBias * dt * shakeWeight; item.vy += (tangentY * shakeStrength * swing + Math.sin(elapsed / 15.5) * (494 + stage * 58)) * bottomBias * dt * shakeWeight; } } else { runtime.shakeAngle *= 0.82; runtime.shakePower *= 0.84; }
-  if (runtime.event.kind === "strawActive") { const tip = currentStrawStab(runtime, now), c = tip.target, dangerRadius = 56 + difficulty * 29 + stage * 7, pullRadius = 286 + difficulty * 99 + stage * 23, pull = 390 + difficulty * 319 + stage * 81, dPlayer = dist(player, tip); if (tip.active && dPlayer < dangerRadius + player.radius * 0.55) { runtime.endSequence = { result: "lost", started: now, until: now + 1000, reason: "\u4f60\u88ab\u5438\u7ba1\u6233\u5230\u4e86", frozenAt: now }; return; } runtime.toppings = runtime.toppings.filter((item) => { const d = dist(item, tip); if (tip.active && d < dangerRadius + item.radius * 0.3) return false; if (d < pullRadius) { const power = (1 - d / pullRadius) * pull * 0.95; item.vx += (c.x - item.x) / Math.max(1, d) * power * dt; item.vy += (c.y - item.y) / Math.max(1, d) * power * dt; } return true; }); }
+  if (runtime.event.kind === "shaking") { const elapsed = now - runtime.event.started, direction = runtime.event.swing ?? 1, pulse = Math.sin(elapsed / 21), swing = direction * pulse; runtime.shakeAngle = swing * (1.64 + difficulty * 0.36); runtime.shakePower = Math.max(0, 1 - elapsed / Math.max(2100, runtime.event.until - runtime.event.started)); const shakeStrength = 3150 + difficulty * 2240 + stage * 320, lateral = Math.cos(elapsed / 21) * direction; for (const item of [player, ...runtime.toppings]) { const dx = item.x - CUP_CENTER.x, dy = item.y - CUP_CENTER.y, len = Math.max(80, Math.hypot(dx, dy)); const tangentX = -dy / len, tangentY = dx / len, bottomBias = 0.65 + cupT(item.y) * 0.9, shakeWeight = item === player ? 0.7 : 1; item.vx += (tangentX * shakeStrength * swing + lateral * shakeStrength * 0.95) * bottomBias * dt * shakeWeight; item.vy += (tangentY * shakeStrength * swing + Math.sin(elapsed / 15.5) * (494 + stage * 58)) * bottomBias * dt * shakeWeight; } } else { runtime.shakeAngle *= 0.82; runtime.shakePower *= 0.84; }
+  if (runtime.event.kind === "strawActive") { const tip = currentStrawStab(runtime, now), c = tip.target, dangerRadius = 54 + difficulty * 18 + stage * 5, pullRadius = 286 + difficulty * 99 + stage * 23, pull = 390 + difficulty * 319 + stage * 81; if (tip.active && pointInStrawRect(player, tip, dangerRadius)) { runtime.endSequence = { result: "lost", started: now, until: now + 1000, reason: "\u4f60\u88ab\u5438\u7ba1\u6233\u5230\u4e86", frozenAt: now }; return; } runtime.toppings = runtime.toppings.filter((item) => { const d = dist(item, tip); if (tip.active && d < dangerRadius + item.radius * 0.3) return false; if (d < pullRadius) { const power = (1 - d / pullRadius) * pull * 0.95; item.vx += (c.x - item.x) / Math.max(1, d) * power * dt; item.vy += (c.y - item.y) / Math.max(1, d) * power * dt; } return true; }); }
   player.x += player.vx * dt; player.y += player.vy * dt; keepInCup(player);
   for (const item of runtime.toppings) { const wander = 21 + item.level * 3.1; item.vx += Math.cos(now / 620 + item.spin) * wander * dt; item.vy += Math.sin(now / 760 + item.spin) * wander * dt; const maxItemSpeed = runtime.event.kind === "shaking" ? 468 + difficulty * 156 : 75 + item.level * 6.5 + difficulty * 31, speed = Math.hypot(item.vx, item.vy); if (speed > maxItemSpeed) { item.vx = item.vx / speed * maxItemSpeed; item.vy = item.vy / speed * maxItemSpeed; } item.x += item.vx * dt; item.y += item.vy * dt; keepInCup(item); }
   for (let i = runtime.toppings.length - 1; i >= 0; i -= 1) { const item = runtime.toppings[i]; if (!isInsideCup(item.x, item.y, item.radius)) continue; if (dist(player, item) < player.radius + item.radius * 0.72) { if (item.level > player.level) { runtime.endSequence = { result: "lost", started: now, until: now + 1000, reason: "\u649e\u4e0a\u4e86\u66f4\u5927\u7684" + levelInfo(item.level).name, frozenAt: now }; runtime.event = { kind: "idle", until: 0, started: now }; return; } runtime.toppings.splice(i, 1); const oldLevel = player.level; player.carried[item.level] = (player.carried[item.level] ?? 0) + 1; runtime.score += item.level === oldLevel ? item.level * 20 : item.level * 10; normalizePlayerInventory(player); if (player.level > oldLevel) { for (let level = oldLevel + 1; level <= player.level; level += 1) runtime.score += level * 100; runtime.highestLevel = Math.max(runtime.highestLevel, player.level); player.vx *= 0.45; player.vy *= 0.45; if (player.level >= 10) { runtime.score += 3000; runtime.endSequence = { result: "won", started: now, until: now + 3000, reason: "\u4f60\u5408\u6210\u4e86\u4f20\u8bf4\u4e2d\u7684\u67ff\u5b50" }; runtime.event = { kind: "idle", until: 0, started: now }; runtime.toppings = []; return; } } } }
@@ -402,7 +396,7 @@ export function MilkTeaGame() {
   const currentAssetUrl = assetUrl(current.assetId);
   const nextAssetUrl = next ? assetUrl(next.assetId) : null;
   const imageButton = (label: string, image: string, onClick: () => void, className = "", disabled = false) => (
-    <button className={"image-button " + className} onClick={onClick} disabled={disabled}>
+    <button className={"image-button " + className} onClick={(event) => { const button = event.currentTarget; button.classList.remove("clicked"); void button.offsetWidth; button.classList.add("clicked"); window.setTimeout(onClick, 130); }} disabled={disabled}>
       <img src={image} alt="" aria-hidden="true" />
       <span>{label}</span>
     </button>
@@ -418,6 +412,10 @@ export function MilkTeaGame() {
     </main>
   );
 }
+
+
+
+
 
 
 
