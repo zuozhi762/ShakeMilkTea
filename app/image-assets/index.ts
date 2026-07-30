@@ -61,10 +61,10 @@ export const TOPPING_LEVELS = [
   { level: 4, name: "\u8292\u679c", emoji: "\u25cf", scale: 1.78, color: "#ffd447", assetId: "topping-mango" },
   { level: 5, name: "\u73cd\u73e0", emoji: "\u25cf", scale: 2.15, color: "#211817", assetId: "topping-boba" },
   { level: 6, name: "\u5e03\u4e01", emoji: "\u25a0", scale: 2.58, color: "#f3b347", assetId: "topping-pudding" },
-  { level: 7, name: "\u4ed9\u8349", emoji: "\u25a0", scale: 3.05, color: "#3f2925", assetId: "topping-grass-jelly" },
-  { level: 8, name: "\u828b\u5706", emoji: "\u25cf", scale: 3.58, color: "#a26be8", assetId: "topping-taro-ball" },
-  { level: 9, name: "\u5976\u76d6\u7403", emoji: "\u25d2", scale: 4.18, color: "#ffe2ef", assetId: "topping-cheese-foam" },
-  { level: 10, name: "\u67ff\u5b50", emoji: "\u25cf", scale: 4.9, color: "#ff8a1c", assetId: "topping-persimmon" },
+  { level: 7, name: "\u4ed9\u8349", emoji: "\u25a0", scale: 3.51, color: "#3f2925", assetId: "topping-grass-jelly" },
+  { level: 8, name: "\u828b\u5706", emoji: "\u25cf", scale: 4.12, color: "#a26be8", assetId: "topping-taro-ball" },
+  { level: 9, name: "\u5976\u76d6\u7403", emoji: "\u25d2", scale: 4.6, color: "#ffe2ef", assetId: "topping-cheese-foam" },
+  { level: 10, name: "\u67ff\u5b50", emoji: "\u25cf", scale: 5.39, color: "#ff8a1c", assetId: "topping-persimmon" },
 ] as const satisfies readonly ToppingLevel[];
 
 const toppingAssets: ImageAssetDefinition[] = TOPPING_LEVELS.map((level) => ({
@@ -205,3 +205,4 @@ export function buildPromptBatch() {
     prompt: buildImagePrompt(asset),
   }));
 }
+

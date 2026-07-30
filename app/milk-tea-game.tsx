@@ -18,7 +18,7 @@ const TXT = {
   defaultHint: "\u8ffd\u7740\u5c0f\u6599\u63a2\u7d22\uff0c\u5408\u6210\u66f4\u523a\u6fc0\u7684\u751c\u751c\u5c0f\u6599\u3002",
   shakeWarn: "\u26a0\ufe0f \u5976\u8336\u8981\u88ab\u5927\u529b\u6447\u5566\uff01",
   shaking: "\u{1f9cb} \u5de6\u53f3\u72c2\u6447\uff01\u6574\u676f\u5c0f\u6599\u90fd\u7529\u8d77\u6765\u4e86\uff01",
-  strawWarn: "\u26a0\ufe0f \u5438\u7ba1\u8981\u6765\u4e86\uff0c\u5feb\u8eb2\u5f00\u7ea2\u5708\uff01",
+  strawWarn: "\u26a0\ufe0f \u5438\u7ba1\u8981\u6765\u4e86\uff0c\u5feb\u8eb2\u5f00\u7ea2\u6846\uff01",
   strawActive: "\u{1f964} \u5438\u7ba1\u6b63\u5728\u5438\uff01\u522b\u9760\u592a\u8fd1\uff01",
 };
 
@@ -105,6 +105,7 @@ function chooseControlledSpawnLevel(runtime: Runtime) {
 function addToppings(runtime: Runtime, count: number, forcedLevel?: number) {
   for (let i = 0; i < count; i += 1) {
     let level = forcedLevel ?? chooseControlledSpawnLevel(runtime);
+    if (forcedLevel == null && runtime.player.level >= 9 && Math.random() < 0.48) level = 10;
     if (level === runtime.player.level && visibleSameLevelCount(runtime, level) >= 2) continue;
     const radius = radiusForLevel(level);
     let point = randomCupPoint(radius);
@@ -142,7 +143,8 @@ function normalizePlayerInventory(player: Player) {
 function eventMessage(event: ActiveEvent) { if (event.kind === "shakeWarning") return TXT.shakeWarn; if (event.kind === "shaking") return TXT.shaking; if (event.kind === "strawWarning") return TXT.strawWarn; if (event.kind === "strawActive") return TXT.strawActive; return TXT.defaultHint; }
 function triggerShake(runtime: Runtime, now: number) { runtime.event = { kind: "shakeWarning", until: now + 800, started: now, swing: Math.random() > 0.5 ? 1 : -1 }; }
 function strawDifficulty(runtime: Runtime) { return clamp(runtime.elapsed / 104000 + Math.max(0, runtime.player.level - 1) / 14, 0, 1.9); }
-function strawPeriod(runtime: Runtime) { const stage = difficultyStage(runtime.elapsed, runtime.player.level); return Math.max(420, 720 - strawDifficulty(runtime) * 120 - stage * 18); }
+function strawPeriod(runtime: Runtime) { const stage = difficultyStage(runtime.elapsed, runtime.player.level); return Math.max(1260, (720 - strawDifficulty(runtime) * 120 - stage * 18) * 3); }
+function strawDangerHalfWidth(runtime: Runtime) { const stage = difficultyStage(runtime.elapsed, runtime.player.level); return 32 + strawDifficulty(runtime) * 11 + stage * 3; }
 function buildStrawStabs(runtime: Runtime): StrawStab[] {
   const d = strawDifficulty(runtime), spread = 0.65 + d * 0.078, y0 = CUP.topY + 360, y1 = CUP.topY + 610, y2 = CUP.topY + 860;
   const points = [
@@ -158,7 +160,7 @@ function currentStrawStab(runtime: Runtime, now: number) {
   const phaseInfo = strawPhase(runtime, now), stabs = runtime.event.stabs ?? buildStrawStabs(runtime), strike = Math.min(stabs.length - 1, phaseInfo.strike), stab = stabs[strike];
   const thrust = phaseInfo.phase < 0.42 ? phaseInfo.phase / 0.42 : phaseInfo.phase < 0.68 ? 1 : 1 - (phaseInfo.phase - 0.68) / 0.32;
   const eased = clamp(thrust, 0, 1), x = stab.fromX + (stab.x - stab.fromX) * eased, y = stab.fromY + (stab.y - stab.fromY) * eased;
-  return { x, y, target: { x: stab.x, y: stab.y }, fromX: stab.fromX, fromY: stab.fromY, active: phaseInfo.phase > 0.18 && phaseInfo.phase < 0.82 && phaseInfo.strike < stabs.length, strike, phase: phaseInfo.phase };
+  return { x, y, target: { x: stab.x, y: stab.y }, fromX: stab.fromX, fromY: stab.fromY, active: phaseInfo.phase >= 0.42 && phaseInfo.phase <= 0.68 && phaseInfo.strike < stabs.length, strike, phase: phaseInfo.phase };
 }
 function keepInCup(item: { x: number; y: number; vx: number; vy: number; radius: number }) { const oldX = item.x, oldY = item.y; const p = clampPointToCup(item.x, item.y, item.radius); item.x = p.x; item.y = p.y; if (Math.abs(item.x - oldX) > 0.01) item.vx *= -0.72; if (Math.abs(item.y - oldY) > 0.01) item.vy *= -0.72; }
 function drawCupPath(ctx: CanvasRenderingContext2D, expand = 0) { const topHalf = CUP.topW / 2 + expand, bottomHalf = CUP.bottomW / 2 + expand; ctx.beginPath(); ctx.moveTo(CUP.centerX - topHalf, CUP.topY - expand); ctx.lineTo(CUP.centerX + topHalf, CUP.topY - expand); ctx.lineTo(CUP.centerX + bottomHalf, CUP.bottomY + expand); ctx.lineTo(CUP.centerX - bottomHalf, CUP.bottomY + expand); ctx.closePath(); }
@@ -177,8 +179,8 @@ function drawAssetBetween(ctx: CanvasRenderingContext2D, image: HTMLImageElement
   ctx.drawImage(image, -width / 2, -length / 2, width, length);
   ctx.restore();
 }
-function drawStrawDangerRect(ctx: CanvasRenderingContext2D, stab: StrawStab, active: boolean, alpha: number) {
-  const dx = stab.x - stab.fromX, dy = stab.y - stab.fromY, length = Math.hypot(dx, dy) + 120, width = active ? 108 : 96;
+function drawStrawDangerRect(ctx: CanvasRenderingContext2D, stab: StrawStab, active: boolean, alpha: number, halfWidth: number) {
+  const dx = stab.x - stab.fromX, dy = stab.y - stab.fromY, length = Math.hypot(dx, dy) + 120, width = halfWidth * 2;
   ctx.save();
   ctx.translate((stab.fromX + stab.x) / 2, (stab.fromY + stab.y) / 2);
   ctx.rotate(Math.atan2(dy, dx) - Math.PI / 2);
@@ -197,7 +199,7 @@ function pointInStrawRect(point: { x: number; y: number; radius: number }, stab:
   const ux = dx / length, uy = dy / length;
   const px = point.x - stab.fromX, py = point.y - stab.fromY;
   const along = px * ux + py * uy, cross = Math.abs(px * -uy + py * ux);
-  return along >= -64 - point.radius && along <= length + 64 + point.radius && cross <= halfWidth + point.radius * 0.45;
+  return along >= -64 && along <= length + 64 && cross <= halfWidth;
 }
 function drawStrawOverlay(ctx: CanvasRenderingContext2D, runtime: Runtime, assets: AssetImageMap) {
   if (runtime.event.kind !== "strawActive") return;
@@ -315,7 +317,7 @@ function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, statu
       const renderNow = runtime.endSequence?.frozenAt ?? performance.now(); const activeStab = runtime.event.kind === "strawActive" ? currentStrawStab(runtime, renderNow) : null; const stabs = runtime.event.stabs ?? buildStrawStabs(runtime); const marks = activeStab ? [stabs[activeStab.strike] ?? stabs[0]] : stabs;
       marks.forEach((mark, index) => {
         const alpha = runtime.event.kind === "strawActive" && activeStab?.strike !== index ? 0.34 : runtime.event.kind === "strawActive" ? 0.82 : 0.72;
-        drawStrawDangerRect(ctx, mark, runtime.event.kind === "strawActive", alpha);
+        drawStrawDangerRect(ctx, mark, runtime.event.kind === "strawActive", alpha, strawDangerHalfWidth(runtime));
       });
       if (runtime.event.kind === "strawActive" && activeStab) { for (let ring = 0; ring < 3; ring += 1) { ctx.strokeStyle = "rgba(255,255,255," + (0.42 - ring * 0.08) + ")"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(activeStab.x, activeStab.y, 30 + ring * 24 + Math.sin(runtime.elapsed / 70 + ring) * 5, 0.2 + ring, Math.PI * 1.66 + ring); ctx.stroke(); } ctx.fillStyle = "rgba(255,255,255,0.86)"; ctx.font = "700 22px sans-serif"; ctx.textAlign = "center"; ctx.fillText(String(activeStab.strike + 1) + "/3", activeStab.target.x, activeStab.target.y - 78); }
     }
@@ -327,14 +329,14 @@ function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, statu
 function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (result: "won" | "lost", reason: string) => void) {
   runtime.elapsed = now - runtime.startTime; const player = runtime.player; const difficulty = Math.min(runtime.elapsed / 150000, 1), stage = difficultyStage(runtime.elapsed, player.level);
   if (runtime.endSequence) { const won = runtime.endSequence.result === "won"; player.vx = 0; player.vy = 0; runtime.target.active = false; runtime.pointer.active = false; runtime.joystick = { x: 0, y: 0, power: 0, active: false }; runtime.shakeAngle = won ? Math.sin((now - runtime.endSequence.started) / 120) * 0.035 * (1 - clamp((now - runtime.endSequence.started) / Math.max(1, runtime.endSequence.until - runtime.endSequence.started), 0, 1)) : runtime.shakeAngle; runtime.shakePower = won ? 0.25 : runtime.shakePower; updateCamera(runtime, dt); if (now >= runtime.endSequence.until) finish(runtime.endSequence.result, runtime.endSequence.reason); return; }
-  if (runtime.event.kind === "idle") { if (runtime.elapsed >= runtime.nextShakeAt) triggerShake(runtime, now); else if (runtime.elapsed >= 3450 && Math.random() < dt * (0.312 + difficulty * 1.118 + stage * 0.144)) triggerStraw(runtime, now); }
+  if (runtime.event.kind === "idle") { if (runtime.elapsed >= runtime.nextShakeAt) triggerShake(runtime, now); else if (runtime.elapsed >= 3450 && Math.random() < dt * ((0.312 + difficulty * 1.118 + stage * 0.144) * 0.7)) triggerStraw(runtime, now); }
   else if (runtime.event.kind === "shakeWarning" && now >= runtime.event.until) { runtime.event = { ...runtime.event, kind: "shaking", until: now + 2405 + difficulty * 845 + stage * 156, started: now }; runtime.shakePower = 1; }
   else if (runtime.event.kind === "shaking" && now >= runtime.event.until) { runtime.score += 100; runtime.event = { kind: "idle", until: 0, started: now }; runtime.nextShakeAt = runtime.elapsed + rand(Math.max(1600, (11000 - difficulty * 4600 - stage * 360) / 3.38), Math.max(2385, (19000 - difficulty * 6500 - stage * 520) / 3.38)); }
   else if (runtime.event.kind === "strawWarning" && now >= runtime.event.until) { const period = strawPeriod(runtime); runtime.event = { ...runtime.event, kind: "strawActive", until: now + period * 3, started: now, period }; }
   else if (runtime.event.kind === "strawActive" && now >= runtime.event.until) { runtime.score += 200; runtime.event = { kind: "idle", until: 0, started: now }; }
   const keyX = (runtime.keys.has("arrowright") || runtime.keys.has("d") ? 1 : 0) - (runtime.keys.has("arrowleft") || runtime.keys.has("a") ? 1 : 0); const keyY = (runtime.keys.has("arrowdown") || runtime.keys.has("s") ? 1 : 0) - (runtime.keys.has("arrowup") || runtime.keys.has("w") ? 1 : 0); let dirX = keyX, dirY = keyY, inputPower = (keyX || keyY) ? 1 : 0;
   if (runtime.joystick.active && inputPower === 0) { dirX = runtime.joystick.x; dirY = runtime.joystick.y; inputPower = runtime.joystick.power; }
-  const speedPenalty = (levelInfo(player.level).scale - 1) * 10, maxSpeed = 166 - speedPenalty;
+  const speedPenalty = (levelInfo(player.level).scale - 1) * 10, maxSpeed = 180 - speedPenalty;
   let targetVx = 0, targetVy = 0, velocityEase = 1;
   if (dirX === 0 && dirY === 0 && runtime.pointer.active) {
     const pointerEase = 1 - Math.exp(-dt * 18);
@@ -350,9 +352,9 @@ function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (resul
   const controlVx = runtime.event.kind === "shaking" ? targetVx * 0.23 : targetVx, controlVy = runtime.event.kind === "shaking" ? targetVy * 0.23 : targetVy;
   player.vx += (controlVx - player.vx) * velocityEase; player.vy += (controlVy - player.vy) * velocityEase;
   if (runtime.event.kind === "shaking") { const elapsed = now - runtime.event.started, direction = runtime.event.swing ?? 1, pulse = Math.sin(elapsed / 21), swing = direction * pulse; runtime.shakeAngle = swing * (2.08 + difficulty * 0.46); runtime.shakePower = Math.max(0, 1 - elapsed / Math.max(2100, runtime.event.until - runtime.event.started)); const shakeStrength = 4200 + difficulty * 2860 + stage * 420; for (const item of [player, ...runtime.toppings]) { const dx = item.x - CUP_CENTER.x, dy = item.y - CUP_CENTER.y, len = Math.max(80, Math.hypot(dx, dy)); const tangentX = -dy / len, tangentY = dx / len, radialX = dx / len, radialY = dy / len, bottomBias = 0.65 + cupT(item.y) * 0.9, shakeWeight = item === player ? 0.7 : 1; const angularKick = shakeStrength * swing * bottomBias * dt * shakeWeight; const radialKick = Math.cos(elapsed / 21) * direction * shakeStrength * 0.22 * bottomBias * dt * shakeWeight; item.vx += tangentX * angularKick + radialX * radialKick; item.vy += tangentY * angularKick + radialY * radialKick; } } else { runtime.shakeAngle *= 0.82; runtime.shakePower *= 0.84; }
-  if (runtime.event.kind === "strawActive") { const tip = currentStrawStab(runtime, now), c = tip.target, dangerRadius = 54 + difficulty * 18 + stage * 5, pullRadius = 286 + difficulty * 99 + stage * 23, pull = 390 + difficulty * 319 + stage * 81; if (tip.active && pointInStrawRect(player, tip, dangerRadius)) { runtime.endSequence = { result: "lost", started: now, until: now + 1000, reason: "\u4f60\u88ab\u5438\u7ba1\u6233\u5230\u4e86", frozenAt: now }; return; } runtime.toppings = runtime.toppings.filter((item) => { const d = dist(item, tip); if (tip.active && d < dangerRadius + item.radius * 0.3) return false; if (d < pullRadius) { const power = (1 - d / pullRadius) * pull * 0.95; item.vx += (c.x - item.x) / Math.max(1, d) * power * dt; item.vy += (c.y - item.y) / Math.max(1, d) * power * dt; } return true; }); }
+  if (runtime.event.kind === "strawActive") { const tip = currentStrawStab(runtime, now), c = tip.target, dangerRadius = strawDangerHalfWidth(runtime), pullRadius = 286 + difficulty * 99 + stage * 23, pull = 390 + difficulty * 319 + stage * 81; if (tip.active && pointInStrawRect(player, tip, dangerRadius)) { runtime.endSequence = { result: "lost", started: now, until: now + 1000, reason: "\u4f60\u88ab\u5438\u7ba1\u6233\u5230\u4e86", frozenAt: now }; return; } runtime.toppings = runtime.toppings.filter((item) => { const d = dist(item, tip); if (tip.active && d < dangerRadius + item.radius * 0.3) return false; if (d < pullRadius) { const power = (1 - d / pullRadius) * pull * 0.95; item.vx += (c.x - item.x) / Math.max(1, d) * power * dt; item.vy += (c.y - item.y) / Math.max(1, d) * power * dt; } return true; }); }
   player.x += player.vx * dt; player.y += player.vy * dt; keepInCup(player);
-  for (const item of runtime.toppings) { const wander = 21 + item.level * 3.1; item.vx += Math.cos(now / 620 + item.spin) * wander * dt; item.vy += Math.sin(now / 760 + item.spin) * wander * dt; const maxItemSpeed = runtime.event.kind === "shaking" ? 468 + difficulty * 156 : 75 + item.level * 6.5 + difficulty * 31, speed = Math.hypot(item.vx, item.vy); if (speed > maxItemSpeed) { item.vx = item.vx / speed * maxItemSpeed; item.vy = item.vy / speed * maxItemSpeed; } item.x += item.vx * dt; item.y += item.vy * dt; keepInCup(item); }
+  for (const item of runtime.toppings) { const wander = 21 + item.level * 3.1; item.vx += Math.cos(now / 620 + item.spin) * wander * dt; item.vy += Math.sin(now / 760 + item.spin) * wander * dt; const levelSpeedRatio = 0.7 + (item.level - 1) / Math.max(1, LEVELS.length - 1) * 0.8, maxItemSpeed = runtime.event.kind === "shaking" ? maxSpeed * Math.min(1.5, levelSpeedRatio + 0.28) : maxSpeed * levelSpeedRatio, speed = Math.hypot(item.vx, item.vy); if (speed > maxItemSpeed) { item.vx = item.vx / speed * maxItemSpeed; item.vy = item.vy / speed * maxItemSpeed; } item.x += item.vx * dt; item.y += item.vy * dt; keepInCup(item); }
   for (let i = runtime.toppings.length - 1; i >= 0; i -= 1) { const item = runtime.toppings[i]; if (!isInsideCup(item.x, item.y, item.radius)) continue; if (dist(player, item) < player.radius + item.radius * 0.72) { if (item.level > player.level) { runtime.endSequence = { result: "lost", started: now, until: now + 1000, reason: "\u649e\u4e0a\u4e86\u66f4\u5927\u7684" + levelInfo(item.level).name, frozenAt: now }; runtime.event = { kind: "idle", until: 0, started: now }; return; } runtime.toppings.splice(i, 1); const oldLevel = player.level; player.carried[item.level] = (player.carried[item.level] ?? 0) + 1; runtime.score += item.level === oldLevel ? item.level * 20 : item.level * 10; normalizePlayerInventory(player); if (player.level > oldLevel) { for (let level = oldLevel + 1; level <= player.level; level += 1) runtime.score += level * 100; runtime.highestLevel = Math.max(runtime.highestLevel, player.level); player.vx *= 0.45; player.vy *= 0.45; if (player.level >= 10) { runtime.score += 3000; runtime.endSequence = { result: "won", started: now, until: now + 3000, reason: "\u4f60\u5408\u6210\u4e86\u4f20\u8bf4\u4e2d\u7684\u67ff\u5b50" }; runtime.event = { kind: "idle", until: 0, started: now }; runtime.toppings = []; return; } } } }
   if (runtime.elapsed - runtime.lastSpawnAt > Math.max(650, 2077 - stage * 310)) { runtime.lastSpawnAt = runtime.elapsed; const desired = 12 + stage * 9 + Math.round(difficulty * 16) + runtime.player.level * 4; if (runtime.toppings.length < desired) addToppings(runtime, Math.min(3 + stage * 3, desired - runtime.toppings.length)); }
   updateCamera(runtime, dt);
@@ -413,6 +415,10 @@ export function MilkTeaGame() {
     </main>
   );
 }
+
+
+
+
 
 
 
