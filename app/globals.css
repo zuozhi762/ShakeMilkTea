@@ -805,3 +805,9 @@ h2 {
   height: 64px;
   margin-top: -3px;
 }
+
+.result-overlay .reason {
+  position: relative;
+  top: 30px;
+  margin-bottom: 34px;
+}
