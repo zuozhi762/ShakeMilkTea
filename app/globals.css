@@ -760,3 +760,48 @@ h2 {
   background: rgba(255, 250, 240, 0.62);
   font-weight: 850;
 }
+
+.result-overlay {
+  gap: 7px;
+  padding-top: 204px;
+}
+
+.result-overlay .logo-bubble {
+  width: 156px;
+  height: 146px;
+  margin-bottom: 1px;
+}
+
+.result-overlay .reason,
+.result-overlay .stat-grid,
+.result-overlay .name-input,
+.result-overlay .button-row,
+.result-overlay > .image-button {
+  transform: none;
+}
+
+.result-overlay .stat-grid {
+  gap: 5px;
+}
+
+.result-overlay .stat-grid span {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  background: rgba(255, 250, 240, 0.68);
+}
+
+.result-overlay .button-row {
+  gap: 6px;
+  margin-top: 0;
+}
+
+.result-overlay .button-row .image-button {
+  width: 142px;
+  height: 62px;
+}
+
+.result-overlay > .image-button {
+  width: 150px;
+  height: 64px;
+  margin-top: -3px;
+}
