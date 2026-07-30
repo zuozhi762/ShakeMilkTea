@@ -181,10 +181,19 @@ function drawIngredient(ctx: CanvasRenderingContext2D, item: { x: number; y: num
   ctx.restore();
 }
 function drawPlayerWithCarried(ctx: CanvasRenderingContext2D, runtime: Runtime, assets: AssetImageMap) {
-  const player = runtime.player; drawIngredient(ctx, player, true, assets);
-  const pieces: number[] = []; player.carried.forEach((count, level) => { for (let i = 0; i < count; i += 1) pieces.push(level); });
+  const player = runtime.player;
+  const pieces: number[] = [];
+  player.carried.forEach((count, level) => { for (let i = 0; i < count; i += 1) pieces.push(level); });
   const time = runtime.elapsed / 1000;
-  pieces.forEach((level, index) => { if (level <= 0) return; const ring = Math.floor(index / 12), slot = index % 12; const angle = slot / 12 * Math.PI * 2 + ring * 0.38 + time * (0.8 + ring * 0.12); const orbit = player.radius + 8 + ring * 8.5 + Math.sin(time * 4.2 + index) * 2.2; const pieceRadius = clamp(radiusForLevel(level) * 0.44, 4.2, Math.max(5.2, player.radius * 0.44)); drawIngredient(ctx, { x: player.x + Math.cos(angle) * orbit, y: player.y + Math.sin(angle) * orbit, level, radius: pieceRadius }, false, assets); });
+  pieces.slice(0, 36).forEach((level, index) => {
+    if (level <= 0) return;
+    const ring = Math.floor(index / 10), slot = index % 10;
+    const angle = slot / 10 * Math.PI * 2 + ring * 0.5 + time * (0.88 + ring * 0.16);
+    const orbit = player.radius + 15 + ring * 12 + Math.sin(time * 4.2 + index) * 2.4;
+    const pieceRadius = clamp(radiusForLevel(level) * 0.54, 5.8, Math.max(8.2, player.radius * 0.58));
+    drawIngredient(ctx, { x: player.x + Math.cos(angle) * orbit, y: player.y + Math.sin(angle) * orbit, level, radius: pieceRadius }, false, assets);
+  });
+  drawIngredient(ctx, player, true, assets);
 }
 function drawWorldBackground(ctx: CanvasRenderingContext2D, runtime: Runtime | null) {
   const bg = ctx.createLinearGradient(0, 0, 0, WORLD_HEIGHT);
@@ -332,14 +341,21 @@ export function MilkTeaGame() {
   const strawUrl = assetUrl("scene-straw");
   const currentAssetUrl = assetUrl(current.assetId);
   const nextAssetUrl = next ? assetUrl(next.assetId) : null;
+  const imageButton = (label: string, image: string, onClick: () => void, className = "", disabled = false) => (
+    <button className={"image-button " + className} onClick={onClick} disabled={disabled}>
+      <img src={image} alt="" aria-hidden="true" />
+      <span>{label}</span>
+    </button>
+  );
   return (
     <main className="game-shell" aria-label="\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86\u6e38\u620f">
       <section className="phone-frame" aria-label="game area"><div className="hud top-hud"><div><small>{"\u5f53\u524d"}</small><strong>{currentAssetUrl ? <img className="hud-icon" src={currentAssetUrl} alt="" /> : current.emoji} {current.name}</strong></div><div><small>{"\u8fdb\u5ea6"}</small><strong>{hud.progress}/3</strong></div><div><small>{"\u65f6\u95f4"}</small><strong>{formatTime(hud.elapsed)}</strong></div></div><canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="game-canvas" onPointerDown={handlePointer} onPointerMove={handlePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer} aria-label="game canvas" /><div className="hud bottom-hud"><span>{hud.message}</span><b>{hud.score} {"\u5206"}</b></div>
         {status === "playing" && <div ref={joystickRef} className={"joystick" + (joystickActive ? " active" : "")} onPointerDown={startJoystick} onPointerMove={updateJoystick} onPointerUp={stopJoystick} onPointerCancel={stopJoystick} aria-label="virtual joystick"><span ref={joystickKnobRef} /></div>}
-        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u25cb"}</div><h1>{"\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h1><p>{"PC \u9f20\u6807\u60ac\u505c\u5c31\u80fd\u62d6\u52a8\uff0c\u4e5f\u53ef\u7528 WASD\u3002\u5408\u6210\u5c0f\u6599\uff0c\u8eb2\u5f00\u7a81\u7136\u6233\u4e0b\u6765\u7684\u5438\u7ba1\u3002"}</p><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={openLeaderboard}>{"\u6392\u884c\u699c"}</button></div>}
-        {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" ? <img src="/generated-assets/ui-success-reward.png" alt="" /> : <img src="/generated-assets/ui-fail-burst.png" alt="" />}</div><h2>{status === "won" ? "\u6311\u6218\u6210\u529f\uff01\u5956\u52b1\u5927\u653e\u9001" : "\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h2><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row"><button onClick={persistScore} disabled={saved}>{saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9"}</button><button className="secondary" onClick={startGame}>{"\u518d\u6765\u4e00\u5c40"}</button></div><button className="ghost" onClick={openLeaderboard}>{"\u770b\u6392\u884c\u699c"}</button></div>}
-        {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u5168\u5c40\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row"><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={() => setStatus("menu")}>{"\u8fd4\u56de"}</button></div></div>}
+        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u25cb"}</div><h1>{"\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h1><p>{"PC \u9f20\u6807\u60ac\u505c\u5c31\u80fd\u62d6\u52a8\uff0c\u4e5f\u53ef\u7528 WASD\u3002\u5408\u6210\u5c0f\u6599\uff0c\u8eb2\u5f00\u7a81\u7136\u6233\u4e0b\u6765\u7684\u5438\u7ba1\u3002"}</p>{imageButton("\u5f00\u59cb\u6e38\u620f", "/generated-assets/ui-start-button.png", startGame)}{imageButton("\u6392\u884c\u699c", "/generated-assets/ui-leaderboard-button.png", openLeaderboard, "secondary")}</div>}
+        {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" ? <img src="/generated-assets/ui-success-reward.png" alt="" /> : <img src="/generated-assets/ui-fail-burst.png" alt="" />}</div><h2>{status === "won" ? "\u6311\u6218\u6210\u529f\uff01\u5956\u52b1\u5927\u653e\u9001" : "\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h2><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row">{imageButton(saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9", "/generated-assets/ui-cream-button.png", persistScore, "cream", saved)}{imageButton("\u518d\u6765\u4e00\u5c40", "/generated-assets/ui-start-button.png", startGame)}</div>{imageButton("\u770b\u6392\u884c\u699c", "/generated-assets/ui-leaderboard-button.png", openLeaderboard, "secondary")}</div>}
+        {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u5168\u5c40\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row">{imageButton("\u5f00\u59cb\u6e38\u620f", "/generated-assets/ui-start-button.png", startGame)}{imageButton("\u8fd4\u56de", "/generated-assets/ui-cream-button.png", () => setStatus("menu"), "cream")}</div></div>}
       </section>
     </main>
   );
 }
+
