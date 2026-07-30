@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { IMAGE_ASSETS, TOPPING_LEVELS, getAssetById, getAssetUrl, type ImageAssetId } from "./image-assets";
@@ -15,7 +15,7 @@ const LEADERBOARD_API = typeof window === "undefined" ? "" : (window.__MILK_TEA_
 const EDGE_TOUCH_RATIO = 0.35;
 const TXT = {
   defaultName: "\u533f\u540d\u5c0f\u6599",
-  defaultHint: "\u955c\u5934\u53ea\u770b\u6574\u676f\u7ea6 1/3\uff0c\u8ffd\u7740\u5c0f\u6599\u63a2\u7d22\u3002",
+  defaultHint: "\u8ffd\u7740\u5c0f\u6599\u63a2\u7d22\uff0c\u5408\u6210\u66f4\u523a\u6fc0\u7684\u751c\u751c\u5c0f\u6599\u3002",
   shakeWarn: "\u26a0\ufe0f \u5976\u8336\u8981\u88ab\u5927\u529b\u6447\u5566\uff01",
   shaking: "\u{1f9cb} \u5de6\u53f3\u72c2\u6447\uff01\u6574\u676f\u5c0f\u6599\u90fd\u7529\u8d77\u6765\u4e86\uff01",
   strawWarn: "\u26a0\ufe0f \u5438\u7ba1\u8981\u6765\u4e86\uff0c\u5feb\u8eb2\u5f00\u7ea2\u5708\uff01",
@@ -187,19 +187,36 @@ function drawPlayerWithCarried(ctx: CanvasRenderingContext2D, runtime: Runtime, 
   pieces.forEach((level, index) => { if (level <= 0) return; const ring = Math.floor(index / 12), slot = index % 12; const angle = slot / 12 * Math.PI * 2 + ring * 0.38 + time * (0.8 + ring * 0.12); const orbit = player.radius + 8 + ring * 8.5 + Math.sin(time * 4.2 + index) * 2.2; const pieceRadius = clamp(radiusForLevel(level) * 0.44, 4.2, Math.max(5.2, player.radius * 0.44)); drawIngredient(ctx, { x: player.x + Math.cos(angle) * orbit, y: player.y + Math.sin(angle) * orbit, level, radius: pieceRadius }, false, assets); });
 }
 function drawWorldBackground(ctx: CanvasRenderingContext2D, runtime: Runtime | null) {
-  const bg = ctx.createLinearGradient(0, 0, 0, WORLD_HEIGHT); bg.addColorStop(0, "#fff2c9"); bg.addColorStop(0.45, "#f0b967"); bg.addColorStop(1, "#98542d"); ctx.fillStyle = bg; ctx.fillRect(-200, -200, WORLD_WIDTH + 400, WORLD_HEIGHT + 400);
-  ctx.fillStyle = "rgba(255,255,255,0.18)"; for (let i = 0; i < 70; i += 1) { ctx.beginPath(); ctx.arc((i * 83) % WORLD_WIDTH, 42 + ((i * 131) % WORLD_HEIGHT), 2 + (i % 5), 0, Math.PI * 2); ctx.fill(); }
-  ctx.strokeStyle = "rgba(255,255,255,0.16)"; ctx.lineWidth = 3; const shift = runtime ? runtime.elapsed / 180 : 0;
-  for (let line = 0; line < 14; line += 1) { ctx.beginPath(); const y = 80 + line * 86; for (let x = -40; x <= WORLD_WIDTH + 40; x += 18) { const wy = y + Math.sin((x + shift + line * 41) / 31) * 8; if (x === -40) ctx.moveTo(x, wy); else ctx.lineTo(x, wy); } ctx.stroke(); }
+  const bg = ctx.createLinearGradient(0, 0, 0, WORLD_HEIGHT);
+  bg.addColorStop(0, "#fffaf0");
+  bg.addColorStop(0.52, "#fff2dd");
+  bg.addColorStop(1, "#f5d7b9");
+  ctx.fillStyle = bg;
+  ctx.fillRect(-200, -200, WORLD_WIDTH + 400, WORLD_HEIGHT + 400);
+  ctx.strokeStyle = "rgba(203, 149, 104, 0.18)";
+  ctx.lineWidth = 1.2;
+  for (let x = -200; x <= WORLD_WIDTH + 220; x += 34) { ctx.beginPath(); ctx.moveTo(x, -200); ctx.lineTo(x, WORLD_HEIGHT + 220); ctx.stroke(); }
+  for (let y = -200; y <= WORLD_HEIGHT + 220; y += 34) { ctx.beginPath(); ctx.moveTo(-200, y); ctx.lineTo(WORLD_WIDTH + 220, y); ctx.stroke(); }
+  ctx.strokeStyle = "rgba(145, 102, 69, 0.16)";
+  ctx.lineWidth = 4;
+  ctx.setLineDash([16, 14]);
+  ctx.strokeRect(16, 18, WORLD_WIDTH - 32, WORLD_HEIGHT - 36);
+  ctx.setLineDash([]);
+  const shift = runtime ? runtime.elapsed / 240 : 0;
+  ctx.strokeStyle = "rgba(224, 151, 128, 0.24)";
+  ctx.lineWidth = 3;
+  for (let line = 0; line < 7; line += 1) { ctx.beginPath(); const y = 142 + line * 150; for (let x = 26; x <= WORLD_WIDTH - 26; x += 22) { const wy = y + Math.sin((x + shift + line * 39) / 38) * 5; if (x === 26) ctx.moveTo(x, wy); else ctx.lineTo(x, wy); } ctx.stroke(); }
+  ctx.fillStyle = "rgba(255, 199, 122, 0.34)";
+  for (let i = 0; i < 30; i += 1) { ctx.beginPath(); ctx.arc((i * 97) % WORLD_WIDTH, 66 + ((i * 151) % WORLD_HEIGHT), 1.4 + (i % 3), 0, Math.PI * 2); ctx.fill(); }
 }
 function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, status: Status, assets: AssetImageMap = {}) {
-  ctx.clearRect(0, 0, WIDTH, HEIGHT); const screenBg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT); screenBg.addColorStop(0, "#fff7da"); screenBg.addColorStop(1, "#a76538"); ctx.fillStyle = screenBg; ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.clearRect(0, 0, WIDTH, HEIGHT); const screenBg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT); screenBg.addColorStop(0, "#fffaf0"); screenBg.addColorStop(1, "#f7d7bd"); ctx.fillStyle = screenBg; ctx.fillRect(0, 0, WIDTH, HEIGHT);
   ctx.save(); if (runtime) { ctx.scale(VIEW_SCALE, VIEW_SCALE); ctx.translate(-runtime.camera.x, -runtime.camera.y); } else { ctx.translate((WIDTH - WORLD_WIDTH * 0.42) / 2, 35); ctx.scale(0.42, 0.42); }
   ctx.save(); if (runtime) { ctx.translate(CUP_CENTER.x, CUP_CENTER.y); ctx.rotate(runtime.shakeAngle); ctx.translate(-CUP_CENTER.x, -CUP_CENTER.y); }
   drawWorldBackground(ctx, runtime); drawCupPath(ctx, 12); ctx.fillStyle = "rgba(255,255,255,0.26)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.82)"; ctx.lineWidth = 7; ctx.stroke();
   const cupImage = assetImage(assets, "scene-milk-tea-cup");
-  if (cupImage) drawAssetCentered(ctx, cupImage, CUP.centerX, CUP_CENTER.y, CUP.topW + 86, CUP.bottomY - CUP.topY + 110, 0.45);
-  drawCupPath(ctx); const tea = ctx.createLinearGradient(0, CUP.topY, 0, CUP.bottomY); tea.addColorStop(0, "rgba(255,219,147,0.76)"); tea.addColorStop(0.48, "rgba(188,113,56,0.86)"); tea.addColorStop(1, "rgba(103,54,30,0.92)"); ctx.fillStyle = tea; ctx.fill();
+  if (cupImage) drawAssetCentered(ctx, cupImage, CUP.centerX, CUP_CENTER.y, CUP.topW + 90, CUP.bottomY - CUP.topY + 118, 0.5);
+  drawCupPath(ctx); const tea = ctx.createLinearGradient(0, CUP.topY, 0, CUP.bottomY); tea.addColorStop(0, "rgba(245,211,158,0.54)"); tea.addColorStop(0.48, "rgba(226,172,116,0.6)"); tea.addColorStop(1, "rgba(194,132,82,0.64)"); ctx.fillStyle = tea; ctx.fill();
   const teaSurface = assetImage(assets, "scene-tea-surface");
   if (teaSurface) {
     ctx.save();
@@ -216,7 +233,7 @@ function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, statu
   ctx.save(); drawCupPath(ctx); ctx.clip();
   if (runtime) {
     if (runtime.event.kind === "shakeWarning" || runtime.event.kind === "shaking") {
-      const waveImage = assetImage(assets, "effect-shake-wave");
+      const waveImage = null;
       if (waveImage) {
         const alpha = runtime.event.kind === "shaking" ? 0.58 : 0.42;
         for (let i = 0; i < 5; i += 1) drawAssetCentered(ctx, waveImage, CUP.centerX + Math.sin(runtime.elapsed / 120 + i) * 36, CUP.topY + 150 + i * 180, 430, 122, alpha);
@@ -241,7 +258,7 @@ function drawScene(ctx: CanvasRenderingContext2D, runtime: Runtime | null, statu
       else { ctx.save(); ctx.lineCap = "round"; ctx.lineWidth = 22; ctx.strokeStyle = "#ff7b93"; ctx.beginPath(); ctx.moveTo(tip.fromX, tip.fromY); ctx.lineTo(tip.x, tip.y); ctx.stroke(); ctx.lineWidth = 8; ctx.strokeStyle = "rgba(255,255,255,0.92)"; ctx.setLineDash([22, 20]); ctx.beginPath(); ctx.moveTo(tip.fromX, tip.fromY); ctx.lineTo(tip.x, tip.y); ctx.stroke(); ctx.restore(); }
     }
   } else { const titleImage = assetImage(assets, "ui-title-badge"); if (titleImage) drawAssetCentered(ctx, titleImage, CUP.centerX, CUP_CENTER.y + 20, 210, 210, 0.9); else { ctx.font = "132px sans-serif"; ctx.textAlign = "center"; ctx.fillText("\u{1f9cb}", CUP.centerX, CUP_CENTER.y + 40); } }
-  ctx.restore(); ctx.restore(); ctx.restore(); ctx.fillStyle = "rgba(77,39,20,0.18)"; ctx.fillRect(0, HEIGHT - 28, WIDTH, 28); if (status !== "playing") { ctx.fillStyle = "rgba(67,31,16,0.22)"; ctx.fillRect(0, 0, WIDTH, HEIGHT); }
+  ctx.restore(); ctx.restore(); ctx.restore(); ctx.fillStyle = "rgba(171,115,72,0.08)"; ctx.fillRect(0, HEIGHT - 28, WIDTH, 28); if (status !== "playing") { ctx.fillStyle = "rgba(255,250,240,0.18)"; ctx.fillRect(0, 0, WIDTH, HEIGHT); }
 }
 function updateRuntime(runtime: Runtime, dt: number, now: number, finish: (result: "won" | "lost", reason: string) => void) {
   runtime.elapsed = now - runtime.startTime; const player = runtime.player; const difficulty = Math.min(runtime.elapsed / 150000, 1), stage = difficultyStage(runtime.elapsed, player.level);
@@ -316,11 +333,11 @@ export function MilkTeaGame() {
   const currentAssetUrl = assetUrl(current.assetId);
   const nextAssetUrl = next ? assetUrl(next.assetId) : null;
   return (
-    <main className="game-shell" aria-label="\u6447\u6447\u5976\u8336\u5927\u5408\u6210\u6e38\u620f">
+    <main className="game-shell" aria-label="\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86\u6e38\u620f">
       <section className="phone-frame" aria-label="game area"><div className="hud top-hud"><div><small>{"\u5f53\u524d"}</small><strong>{currentAssetUrl ? <img className="hud-icon" src={currentAssetUrl} alt="" /> : current.emoji} {current.name}</strong></div><div><small>{"\u8fdb\u5ea6"}</small><strong>{hud.progress}/3</strong></div><div><small>{"\u65f6\u95f4"}</small><strong>{formatTime(hud.elapsed)}</strong></div></div><canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="game-canvas" onPointerDown={handlePointer} onPointerMove={handlePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer} aria-label="game canvas" /><div className="hud bottom-hud"><span>{hud.message}</span><b>{hud.score} {"\u5206"}</b></div>
         {status === "playing" && <div ref={joystickRef} className={"joystick" + (joystickActive ? " active" : "")} onPointerDown={startJoystick} onPointerMove={updateJoystick} onPointerUp={stopJoystick} onPointerCancel={stopJoystick} aria-label="virtual joystick"><span ref={joystickKnobRef} /></div>}
-        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u25cb"}</div><h1>{"\u6447\u6447\u5976\u8336\u5927\u5408\u6210"}</h1><p>{"PC \u4f7f\u7528\u9f20\u6807\u6216 WASD\uff0c\u624b\u673a\u4f7f\u7528\u5de6\u4e0b\u6447\u6746\u3002\u5408\u6210\u5c0f\u6599\uff0c\u8eb2\u5f00\u8fde\u7eed\u6233\u4e0b\u6765\u7684\u5438\u7ba1\u3002"}</p><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={openLeaderboard}>{"\u6392\u884c\u699c"}</button></div>}
-        {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" && victoryBurstUrl ? <img src={victoryBurstUrl} alt="" /> : status === "lost" && strawUrl ? <img src={strawUrl} alt="" /> : status === "won" ? "\u25cb" : "|"}</div><h2>{status === "won" ? "\u8d85\u7ea7\u65e0\u654c\u597d\u559d\u5730\u80dc\u5229\uff01" : "\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h2><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row"><button onClick={persistScore} disabled={saved}>{saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9"}</button><button className="secondary" onClick={startGame}>{"\u518d\u6765\u4e00\u5c40"}</button></div><button className="ghost" onClick={openLeaderboard}>{"\u770b\u6392\u884c\u699c"}</button></div>}
+        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u25cb"}</div><h1>{"\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h1><p>{"PC \u9f20\u6807\u60ac\u505c\u5c31\u80fd\u62d6\u52a8\uff0c\u4e5f\u53ef\u7528 WASD\u3002\u5408\u6210\u5c0f\u6599\uff0c\u8eb2\u5f00\u7a81\u7136\u6233\u4e0b\u6765\u7684\u5438\u7ba1\u3002"}</p><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={openLeaderboard}>{"\u6392\u884c\u699c"}</button></div>}
+        {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" ? <img src="/generated-assets/ui-success-reward.png" alt="" /> : <img src="/generated-assets/ui-fail-burst.png" alt="" />}</div><h2>{status === "won" ? "\u6311\u6218\u6210\u529f\uff01\u5956\u52b1\u5927\u653e\u9001" : "\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86"}</h2><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row"><button onClick={persistScore} disabled={saved}>{saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9"}</button><button className="secondary" onClick={startGame}>{"\u518d\u6765\u4e00\u5c40"}</button></div><button className="ghost" onClick={openLeaderboard}>{"\u770b\u6392\u884c\u699c"}</button></div>}
         {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u5168\u5c40\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row"><button className="asset-button" onClick={startGame}>{"\u5f00\u59cb\u6e38\u620f"}</button><button className="secondary" onClick={() => setStatus("menu")}>{"\u8fd4\u56de"}</button></div></div>}
       </section>
     </main>

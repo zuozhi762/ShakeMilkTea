@@ -1,34 +1,134 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="&#25671;&#25671;&#22902;&#33590;&#22823;&#21512;&#25104;" />
-    <title>&#25671;&#25671;&#22902;&#33590;&#22823;&#21512;&#25104;</title>
+    <meta name="description" content="这杯有点太刺激了" />
+    <title>这杯有点太刺激了</title>
     <style>
-      html,
-      body {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        overflow: hidden;
-        background: #fff3cf;
-      }
-
-      iframe {
-        display: block;
-        width: 100%;
-        height: 100%;
-        border: 0;
-        background: #fff3cf;
-      }
+      * { box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; color: #5b3b31; font-family: ui-rounded, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; background: linear-gradient(rgba(255,248,236,.34), rgba(255,248,236,.18)), url("public/generated-assets/page-background.png") center / cover no-repeat, #fff8ec; }
+      body::before, body::after { content: ""; position: fixed; z-index: 0; pointer-events: none; opacity: .78; }
+      body::before { left: max(8px, calc(50% - 260px)); top: 9px; width: 178px; height: 45px; transform: rotate(-13deg); background: repeating-linear-gradient(90deg, rgba(255,255,255,.35) 0 9px, transparent 9px 18px), #ef9fbd; border: 1px dashed rgba(125,82,83,.22); }
+      body::after { right: max(8px, calc(50% - 255px)); top: 11px; width: 134px; height: 38px; transform: rotate(14deg); background: radial-gradient(circle, rgba(255,255,255,.65) 1.5px, transparent 2px) 0 0 / 17px 17px, #f6ca88; border: 1px dashed rgba(125,82,83,.2); }
+      .game-shell { position: relative; z-index: 1; width: 100%; min-height: 100dvh; padding: clamp(8px,2.2vw,18px); display: grid; place-items: center; }
+      .phone-frame { position: relative; width: min(100%, calc(100dvh * 390 / 700), 430px); padding: clamp(8px,2vw,12px); border: 2px solid rgba(210,166,122,.36); border-radius: 8px; background: linear-gradient(rgba(214,164,116,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(214,164,116,.1) 1px, transparent 1px), #fffaf0; background-size: 24px 24px; box-shadow: 0 14px 38px rgba(99,63,37,.12), inset 0 0 0 7px rgba(255,255,255,.46); overflow: hidden; }
+      .phone-frame::before, .phone-frame::after { content: ""; position: absolute; z-index: 12; width: 86px; height: 28px; pointer-events: none; opacity: .86; }
+      .phone-frame::before { left: -18px; top: 12px; transform: rotate(-18deg); background: repeating-linear-gradient(90deg, rgba(255,255,255,.36) 0 8px, transparent 8px 16px), #eda0c5; }
+      .phone-frame::after { right: -17px; bottom: 56px; transform: rotate(-18deg); background: radial-gradient(circle, rgba(255,255,255,.66) 1.6px, transparent 2px) 0 0 / 15px 15px, #b9acd8; }
+      canvas { display: block; width: 100%; aspect-ratio: 390 / 700; border-radius: 8px; background: #fff8ec; touch-action: none; user-select: none; }
+      .hud { position: absolute; left: 28px; right: 28px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; }
+      .top-hud { top: 25px; }
+      .bottom-hud { bottom: 25px; border: 1px dashed rgba(134,87,67,.22); border-radius: 8px; padding: 10px 13px; background: rgba(255,250,240,.84); box-shadow: 0 5px 0 rgba(128,92,62,.08); font-size: 13px; font-weight: 800; }
+      .hud > div { min-width: 0; border: 1px dashed rgba(134,87,67,.23); border-radius: 8px; padding: 8px 10px; background: rgba(255,250,240,.88); box-shadow: 0 4px 0 rgba(128,92,62,.08); }
+      .hud small { display: block; margin-bottom: 2px; color: rgba(91,59,49,.62); font-size: 10px; font-weight: 900; }
+      .hud strong, .bottom-hud b { font-size: 14px; white-space: nowrap; }
+      .hud-icon { width: 22px; height: 22px; object-fit: contain; vertical-align: middle; }
+      .overlay { position: absolute; inset: 14px; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 26px; border: 2px solid rgba(211,169,123,.34); border-radius: 8px; background: linear-gradient(rgba(214,164,116,.09) 1px, transparent 1px), linear-gradient(90deg, rgba(214,164,116,.09) 1px, transparent 1px), rgba(255,250,240,.94); background-size: 24px 24px; box-shadow: inset 0 0 0 6px rgba(255,255,255,.42), 0 10px 0 rgba(128,92,62,.07); text-align: center; }
+      .overlay::before { content: ""; position: absolute; left: 20px; top: 18px; width: 82px; height: 30px; transform: rotate(-12deg); background: radial-gradient(circle, rgba(255,255,255,.7) 1.4px, transparent 2px) 0 0 / 14px 14px, #bed5eb; opacity: .72; }
+      .logo-bubble { width: 116px; height: 96px; display: grid; place-items: center; background: transparent; filter: drop-shadow(0 7px 0 rgba(124,78,45,.1)); }
+      .logo-bubble img { width: 100%; height: 100%; object-fit: contain; display: block; }
+      h1 { margin: 0 0 2px; color: #6a4234; font-size: 35px; line-height: 1.08; letter-spacing: 0; text-shadow: 0 4px 0 rgba(239,155,145,.22); }
+      h2 { margin: 0 0 10px; color: #6a4234; font-size: 26px; letter-spacing: 0; }
+      p { max-width: 300px; margin: 0; color: rgba(91,59,49,.75); line-height: 1.58; }
+      button { position: relative; min-width: 142px; border: 2px solid rgba(255,255,255,.64); border-radius: 999px; padding: 12px 20px; color: #6a4234; background: #eda095; box-shadow: inset 0 0 0 2px rgba(255,255,255,.18), 0 5px 0 rgba(154,92,77,.22); font: inherit; font-weight: 950; cursor: pointer; }
+      button::after { content: ""; position: absolute; inset: 7px 11px; border: 1px dashed rgba(255,255,255,.64); border-radius: 999px; pointer-events: none; }
+      button.secondary { background: #a99ad2; background-image: url("public/generated-assets/ui-leaderboard-button.png"); background-size: 100% 100%; border-color: transparent; color: #fffaf0; box-shadow: inset 0 0 0 2px rgba(255,255,255,.16), 0 5px 0 rgba(105,85,138,.22); }
+      button.ghost { background: #f2d298; background-image: url("public/generated-assets/ui-cream-button.png"); background-size: 100% 100%; color: #6a4234; }
+      .asset-button { background-image: url("public/generated-assets/ui-start-button.png"); background-size: 100% 100%; background-color: transparent; border-color: transparent; box-shadow: none; }
+      .stat-grid { width: min(100%, 310px); display: grid; gap: 8px; }
+      .stat-grid span { display: flex; align-items: center; justify-content: space-between; border: 1px dashed rgba(134,87,67,.18); border-radius: 8px; padding: 10px 12px; background: rgba(255,255,255,.58); }
+      .button-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+      .leaderboard { width: min(100%, 330px); max-height: 390px; margin: 0; padding: 0; display: grid; gap: 8px; overflow: auto; list-style: none; text-align: left; }
+      .leaderboard li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; border: 1px dashed rgba(134,87,67,.18); border-radius: 8px; padding: 10px; background: rgba(255,255,255,.62); }
+      .rank { color: #b76f4d; font-weight: 950; }
+      .record-main { display: grid; gap: 2px; }
+      .record-main small { color: rgba(91,59,49,.62); }
+      .result-success { background: center 34px / 250px auto no-repeat url("public/generated-assets/ui-success-reward.png"), rgba(255,250,240,.96); }
+      .result-fail { background: center 42px / 230px auto no-repeat url("public/generated-assets/ui-fail-burst.png"), rgba(255,246,234,.96); }
+      .hidden { display: none; }
+      @media (max-width: 520px) { .game-shell { padding: 8px; display: block; } .phone-frame { width: min(100%, calc(100dvh * 390 / 700)); max-height: 100dvh; padding: 8px; } .overlay { inset: 8px; padding: 20px; } .top-hud { top: 16px; } .bottom-hud { bottom: 16px; } .hud { left: 18px; right: 18px; } h1 { font-size: 31px; } }
     </style>
   </head>
   <body>
-    <iframe
-      title="&#25671;&#25671;&#22902;&#33590;&#22823;&#21512;&#25104;"
-      src="https://shake-milk-tea-game.qinliuyue777.chatgpt.site/"
-      allow="fullscreen; clipboard-write"
-    ></iframe>
+    <main class="game-shell" aria-label="这杯有点太刺激了游戏">
+      <section class="phone-frame" aria-label="game area">
+        <div class="hud top-hud">
+          <div><small>当前角色</small><strong id="currentRole">西米</strong></div>
+          <div><small>进度</small><strong id="progress">1/3</strong></div>
+          <div><small>存活时间</small><strong id="timer">00:00</strong></div>
+        </div>
+        <canvas id="game" width="390" height="700" aria-label="game canvas"></canvas>
+        <div class="hud bottom-hud"><span id="message">追着小料探索，合成更大的甜甜小料。</span><b><span id="score">0</span> 分</b></div>
+        <div id="menu" class="overlay">
+          <div class="logo-bubble"><img src="public/generated-assets/ui-title-badge.png" alt="" /></div>
+          <h1>这杯有点太刺激了</h1>
+          <p>PC 鼠标悬停就能拖动，也可用 WASD。合成小料，躲开突然戳下来的吸管。</p>
+          <button class="asset-button" id="startBtn">开始游戏</button>
+          <button class="secondary" id="rankBtn">排行榜</button>
+        </div>
+        <div id="result" class="overlay hidden">
+          <div class="logo-bubble"><img id="resultIcon" src="public/generated-assets/ui-victory-burst.png" alt="" /></div>
+          <h2 id="resultTitle">这杯有点太刺激了</h2>
+          <p id="reason"></p>
+          <div class="stat-grid"><span>存活时间 <b id="finalTime">00:00</b></span><span>最高等级 <b id="finalLevel">西米</b></span><span>最终分数 <b id="finalScore">0</b></span></div>
+          <div class="button-row"><button id="againBtn">再来一局</button><button class="secondary" id="toRankBtn">看排行榜</button></div>
+        </div>
+        <div id="rank" class="overlay hidden">
+          <h2>本地排行榜</h2>
+          <ol id="rankList" class="leaderboard"></ol>
+          <div class="button-row"><button class="asset-button" id="rankStartBtn">开始游戏</button><button class="secondary" id="backBtn">返回</button></div>
+        </div>
+      </section>
+    </main>
+    <script>
+      (() => {
+        const W = 390, H = 700, WORLD_W = 690, WORLD_H = 1230, SCALE = 1.75;
+        const CUP = { topY: 46, bottomY: 1188, topW: 575, bottomW: 405, centerX: WORLD_W / 2 };
+        const levels = [
+          ['西米','topping-sago.png',1], ['红豆','topping-red-bean.png',1.22], ['椰果粒','topping-coconut.png',1.34], ['芒果','topping-mango.png',1.78], ['珍珠','topping-boba.png',2.15],
+          ['布丁','topping-pudding.png',2.58], ['仙草','topping-grass-jelly.png',3.05], ['芋圆','topping-taro-ball.png',3.58], ['奶盖球','topping-cheese-foam.png',4.18], ['柿子','topping-persimmon.png',4.9]
+        ];
+        const assetNames = ['scene-milk-tea-cup.png','scene-straw.png','scene-tea-surface.png','effect-shake-wave.png','ui-success-reward.png','ui-fail-burst.png', ...levels.map(l => l[1])];
+        const assets = {};
+        assetNames.forEach(name => { const img = new Image(); img.src = 'public/generated-assets/' + name; assets[name] = img; });
+        const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+        const els = Object.fromEntries(['menu','result','rank','currentRole','progress','timer','message','score','resultTitle','reason','finalTime','finalLevel','finalScore','rankList','resultIcon'].map(id => [id, document.getElementById(id)]));
+        const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+        const rand = (a,b) => a + Math.random() * (b-a);
+        const fmt = ms => { const t = Math.max(0, Math.floor(ms/1000)); return String(Math.floor(t/60)).padStart(2,'0') + ':' + String(t%60).padStart(2,'0'); };
+        const dist = (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
+        const cupT = y => clamp((y-CUP.topY)/(CUP.bottomY-CUP.topY),0,1);
+        const cupHalf = y => CUP.topW/2 + (CUP.bottomW/2-CUP.topW/2)*cupT(y);
+        const radiusFor = level => (level === 1 ? 7.2 : 8.6 * levels[level-1][2]);
+        const bounds = (y,r=0) => ({ left: CUP.centerX - cupHalf(y) + r, right: CUP.centerX + cupHalf(y) - r });
+        const inside = (x,y,r) => y >= CUP.topY+r && y <= CUP.bottomY-r && x >= bounds(y,r).left && x <= bounds(y,r).right;
+        const keep = item => { const y = clamp(item.y, CUP.topY+item.r*.35, CUP.bottomY-item.r*.35); const b = bounds(y,item.r*.35); if (item.x < b.left || item.x > b.right) item.vx *= -.72; if (item.y !== y) item.vy *= -.72; item.x = clamp(item.x,b.left,b.right); item.y = y; };
+        let state = 'menu', runtime = null, pointer = {active:false,x:W/2/SCALE,y:H/2/SCALE}, keys = new Set();
+        function addToppings(n, forced) { for (let i=0;i<n;i++) { const lvl = forced || clamp(Math.ceil(Math.random()*Math.min(10, runtime.player.level+2)), 1, 10); const r = radiusFor(lvl); let y = rand(CUP.topY+r+20, CUP.bottomY-r-20), b = bounds(y,r+14); runtime.toppings.push({x:rand(b.left,b.right), y, vx:rand(-40,40), vy:rand(-40,40), level:lvl, r, spin:rand(0,7)}); } }
+        function start() { runtime = { start: performance.now(), last: performance.now(), elapsed:0, score:0, high:1, player:{x:CUP.centerX,y:CUP.bottomY-160,vx:0,vy:0,level:1,r:radiusFor(1),carry:0,orbit:[]}, toppings:[], camera:{x:0,y:720}, event:null, nextEvent:6500, ended:false }; addToppings(8,1); addToppings(2,2); state='playing'; hideAll(); requestAnimationFrame(loop); }
+        function hideAll(){ els.menu.classList.add('hidden'); els.result.classList.add('hidden'); els.rank.classList.add('hidden'); }
+        function showMenu(){ state='menu'; hideAll(); els.menu.classList.remove('hidden'); draw(); }
+        function showRank(){ state='rank'; hideAll(); renderRank(); els.rank.classList.remove('hidden'); draw(); }
+        function finish(title, reason, won=false) { runtime.ended = true; state='result'; els.result.className = 'overlay ' + (won ? 'result-success' : 'result-fail'); els.resultIcon.src = won ? 'public/generated-assets/ui-success-reward.png' : 'public/generated-assets/ui-fail-burst.png'; const record={score:runtime.score, time:runtime.elapsed, level:runtime.high, date:Date.now(), title}; const list=JSON.parse(localStorage.getItem('shake_static_rank')||'[]'); list.push(record); list.sort((a,b)=>b.level-a.level||b.score-a.score||b.time-a.time); localStorage.setItem('shake_static_rank', JSON.stringify(list.slice(0,10))); els.resultTitle.textContent=title; els.reason.textContent=reason; els.finalTime.textContent=fmt(runtime.elapsed); els.finalLevel.textContent=levels[runtime.high-1][0]; els.finalScore.textContent=runtime.score; hideAll(); els.result.classList.remove('hidden'); }
+        function renderRank(){ const list=JSON.parse(localStorage.getItem('shake_static_rank')||'[]'); els.rankList.innerHTML = list.length ? list.map((r,i)=>`<li><span class="rank">#${i+1}</span><span class="record-main"><b>${r.title}</b><small>${levels[r.level-1][0]} / ${fmt(r.time)}</small></span><strong>${r.score}</strong></li>`).join('') : '<li><span class="record-main"><b>还没有成绩</b><small>第一杯奶茶，等你来摇。</small></span></li>'; }
+        function drawCupPath(){ const top=CUP.topW/2, bottom=CUP.bottomW/2; ctx.beginPath(); ctx.moveTo(CUP.centerX-top,CUP.topY); ctx.lineTo(CUP.centerX+top,CUP.topY); ctx.lineTo(CUP.centerX+bottom,CUP.bottomY); ctx.lineTo(CUP.centerX-bottom,CUP.bottomY); ctx.closePath(); }
+        function drawAsset(img,x,y,w,h,a=1){ if(!img || !img.complete) return; ctx.save(); ctx.globalAlpha=a; ctx.drawImage(img,x-w/2,y-h/2,w,h); ctx.restore(); }
+        function bg(){ const g=ctx.createLinearGradient(0,0,0,WORLD_H); g.addColorStop(0,'#fffaf0'); g.addColorStop(.55,'#fff2dd'); g.addColorStop(1,'#f5d7b9'); ctx.fillStyle=g; ctx.fillRect(-200,-200,WORLD_W+400,WORLD_H+400); ctx.strokeStyle='rgba(203,149,104,.18)'; ctx.lineWidth=1.2; for(let x=-200;x<WORLD_W+220;x+=34){ctx.beginPath();ctx.moveTo(x,-200);ctx.lineTo(x,WORLD_H+220);ctx.stroke();} for(let y=-200;y<WORLD_H+220;y+=34){ctx.beginPath();ctx.moveTo(-200,y);ctx.lineTo(WORLD_W+220,y);ctx.stroke();} ctx.strokeStyle='rgba(145,102,69,.16)'; ctx.lineWidth=4; ctx.setLineDash([16,14]); ctx.strokeRect(16,18,WORLD_W-32,WORLD_H-36); ctx.setLineDash([]); }
+        function drawIngredient(item, player=false){ const img=assets[levels[item.level-1][1]], size=item.r*(player?3.15:2.9); if(player){ ctx.save(); ctx.filter='drop-shadow(0 0 5px rgba(255,205,95,.95))'; drawAsset(img,item.x,item.y,size,size); ctx.restore(); } else drawAsset(img,item.x,item.y,size,size); }
+        function drawPlayer(){ const p=runtime.player; drawIngredient(p,true); const t=runtime.elapsed/1000; p.orbit.slice(-18).forEach((lvl,i)=>{ const ring=Math.floor(i/10), slot=i%10, a=slot/10*Math.PI*2 + ring*.45 + t*(.9+ring*.15); const rr=p.r+13+ring*10; drawIngredient({x:p.x+Math.cos(a)*rr,y:p.y+Math.sin(a)*rr,level:lvl,r:Math.max(4.6, radiusFor(lvl)*.42)}); }); }
+        function draw(){ ctx.clearRect(0,0,W,H); const screen=ctx.createLinearGradient(0,0,W,H); screen.addColorStop(0,'#fffaf0'); screen.addColorStop(1,'#f7d7bd'); ctx.fillStyle=screen; ctx.fillRect(0,0,W,H); ctx.save(); if(runtime){ ctx.scale(SCALE,SCALE); ctx.translate(-runtime.camera.x,-runtime.camera.y); } else { ctx.translate((W-WORLD_W*.42)/2,35); ctx.scale(.42,.42); } bg(); drawCupPath(); ctx.fillStyle='rgba(255,255,255,.26)'; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.82)'; ctx.lineWidth=7; ctx.stroke(); drawAsset(assets['scene-milk-tea-cup.png'],CUP.centerX,(CUP.topY+CUP.bottomY)/2,CUP.topW+90,CUP.bottomY-CUP.topY+118,.5); drawCupPath(); const tea=ctx.createLinearGradient(0,CUP.topY,0,CUP.bottomY); tea.addColorStop(0,'rgba(245,211,158,.54)'); tea.addColorStop(.48,'rgba(226,172,116,.60)'); tea.addColorStop(1,'rgba(194,132,82,.64)'); ctx.fillStyle=tea; ctx.fill(); ctx.save(); drawCupPath(); ctx.clip(); if(runtime){ runtime.toppings.sort((a,b)=>a.level-b.level).forEach(t=>drawIngredient(t)); drawPlayer(); if(runtime.event){ const t=runtime.event; if(t.kind==='shake'){ ctx.strokeStyle='rgba(255,255,255,.48)'; ctx.lineWidth=8; for(let i=0;i<6;i++){ ctx.beginPath(); const y=CUP.topY+120+i*160; ctx.moveTo(CUP.centerX-190,y); ctx.bezierCurveTo(CUP.centerX-80,y-80,CUP.centerX+80,y+80,CUP.centerX+190,y); ctx.stroke(); } } if(t.kind==='straw'){ ctx.strokeStyle='rgba(255,82,111,.62)'; ctx.lineWidth=5; ctx.setLineDash([14,10]); ctx.beginPath(); ctx.arc(t.x,t.y,58+Math.sin(runtime.elapsed/90)*7,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); drawAsset(assets['scene-straw.png'],t.x-35,t.y-160,88,420,.9); } } } else drawAsset(assets['ui-title-badge.png'],CUP.centerX,(CUP.topY+CUP.bottomY)/2+20,250,220,.95); ctx.restore(); ctx.restore(); if(state !== 'playing'){ ctx.fillStyle='rgba(255,250,240,.18)'; ctx.fillRect(0,0,W,H); } }
+        function update(dt, now){ runtime.elapsed = now - runtime.start; const p=runtime.player; let dx=0,dy=0; if(keys.has('a')||keys.has('arrowleft')) dx--; if(keys.has('d')||keys.has('arrowright')) dx++; if(keys.has('w')||keys.has('arrowup')) dy--; if(keys.has('s')||keys.has('arrowdown')) dy++; if(!dx&&!dy&&pointer.active){ const sx=p.x-runtime.camera.x, sy=p.y-runtime.camera.y; dx=pointer.x-sx; dy=pointer.y-sy; } const len=Math.hypot(dx,dy); if(len>.4){ dx/=len; dy/=len; p.vx+=(dx*190-p.vx)*.18; p.vy+=(dy*190-p.vy)*.18; } else { p.vx*=.86; p.vy*=.86; } p.x+=p.vx*dt; p.y+=p.vy*dt; keep(p); runtime.toppings.forEach(t=>{ t.vx+=Math.cos(now/620+t.spin)*18*dt; t.vy+=Math.sin(now/760+t.spin)*18*dt; t.x+=t.vx*dt; t.y+=t.vy*dt; keep(t); }); for(let i=runtime.toppings.length-1;i>=0;i--){ const t=runtime.toppings[i]; if(dist(p,t)<p.r+t.r*.72){ if(t.level>p.level) return finish('这杯有点太刺激了','撞上了更大的' + levels[t.level-1][0], false); runtime.toppings.splice(i,1); runtime.score += t.level*20; if(t.level < p.level) p.orbit.push(t.level); else p.carry++; if(p.carry>=3){ p.carry=0; p.orbit = []; p.level++; p.r=radiusFor(p.level); runtime.high=Math.max(runtime.high,p.level); runtime.score += p.level*100; if(p.level>=10) return finish('挑战成功！奖励大放送','你合成了传说中的柿子', true); } } } if(runtime.toppings.length < 12 + p.level*2) addToppings(1); if(runtime.elapsed > runtime.nextEvent){ runtime.event = Math.random()<.55 ? {kind:'shake', until: now+1500} : {kind:'straw', x:rand(CUP.centerX-170,CUP.centerX+170), y:rand(CUP.topY+320,CUP.bottomY-180), until: now+1900}; runtime.nextEvent = runtime.elapsed + rand(5200,9200); } if(runtime.event){ if(runtime.event.kind==='shake'){ runtime.toppings.forEach(t=>{ t.vx += Math.sin(now/45)*18; t.vy += Math.cos(now/58)*8; }); } if(runtime.event.kind==='straw' && dist(p,runtime.event)<p.r+42) return finish('这杯有点太刺激了','你被吸管戳到了', false); if(now>runtime.event.until) { runtime.event=null; runtime.score+=100; } } const viewW=W/SCALE, viewH=H/SCALE; runtime.camera.x += (clamp(p.x-viewW/2,0,WORLD_W-viewW)-runtime.camera.x)*.12; runtime.camera.y += (clamp(p.y-viewH/2,0,WORLD_H-viewH)-runtime.camera.y)*.12; }
+        function loop(now){ if(state!=='playing'||!runtime||runtime.ended) return; const dt=Math.min(.033, Math.max(.001,(now-runtime.last)/1000)); runtime.last=now; update(dt,now); draw(); els.currentRole.innerHTML = `<img class="hud-icon" src="public/generated-assets/${levels[runtime.player.level-1][1]}" alt="" /> ${levels[runtime.player.level-1][0]}`; els.progress.textContent = (runtime.player.carry+1) + '/3'; els.timer.textContent=fmt(runtime.elapsed); els.score.textContent=runtime.score; els.message.textContent=runtime.event ? (runtime.event.kind==='straw'?'吸管要来了，快躲开红圈！':'奶茶正在摇晃，小料飞起来了！') : '追着小料探索，合成更大的甜甜小料。'; requestAnimationFrame(loop); }
+        canvas.addEventListener('pointerdown', e=>{ pointer.active=true; canvas.setPointerCapture(e.pointerId); movePointer(e); });
+        canvas.addEventListener('pointermove', e=>{ if(e.pointerType !== 'touch') pointer.active = true; movePointer(e); }); canvas.addEventListener('pointerup', e=>{ if(e.pointerType === 'touch') pointer.active=false; }); canvas.addEventListener('pointercancel', e=>{ if(e.pointerType === 'touch') pointer.active=false; });
+        function movePointer(e){ const r=canvas.getBoundingClientRect(); pointer.x=(e.clientX-r.left)/r.width*W/SCALE; pointer.y=(e.clientY-r.top)/r.height*H/SCALE; }
+        addEventListener('keydown', e=>{ const k=e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)){ e.preventDefault(); keys.add(k); }});
+        addEventListener('keyup', e=>keys.delete(e.key.toLowerCase()));
+        document.getElementById('startBtn').onclick=start; document.getElementById('againBtn').onclick=start; document.getElementById('rankStartBtn').onclick=start;
+        document.getElementById('rankBtn').onclick=showRank; document.getElementById('toRankBtn').onclick=showRank; document.getElementById('backBtn').onclick=showMenu;
+        showMenu();
+      })();
+    </script>
   </body>
 </html>

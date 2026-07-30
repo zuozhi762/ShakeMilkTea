@@ -2,8 +2,8 @@
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "摇摇奶茶大合成",
-  description: "一款奶茶版召唤神龙 2D 网页小游戏。",
+  title: "这杯有点太刺激了",
+  description: "在温暖手帐风奶茶杯里合成小料，躲开刺激吸管。",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

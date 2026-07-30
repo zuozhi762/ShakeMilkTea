@@ -2,8 +2,8 @@
 import { MilkTeaGame } from "./milk-tea-game";
 
 export const metadata: Metadata = {
-  title: "摇摇奶茶大合成",
-  description: "在会晃动、会被吸管吸走的奶茶杯里，从西米一路合成到柿子。",
+  title: "这杯有点太刺激了",
+  description: "在温暖手帐风奶茶杯里合成小料，躲开刺激吸管。",
 };
 
 export default function Home() {

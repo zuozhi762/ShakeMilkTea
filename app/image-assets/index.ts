@@ -1,4 +1,4 @@
-export type ImageAssetCategory = "topping" | "ui" | "scene" | "effect";
+﻿export type ImageAssetCategory = "topping" | "ui" | "scene" | "effect";
 export type ImageAssetStatus = "planned" | "generated" | "approved";
 
 export type ImageAssetId =
@@ -45,11 +45,11 @@ export type ImageAssetDefinition = {
 export const GENERATED_ASSET_BASE = "/generated-assets";
 
 export const REFERENCE_STYLE_PROFILE = {
-  name: "kawaii hand-account sticker illustration",
-  source: "current user direction",
+  name: "kawaii scrapbook milk-tea watercolor",
+  source: "user-provided reference image",
   description:
-    "A refined kawaii scrapbook and hand-account sticker style with pastel colors, warm brown linework, thin white sticker borders, soft watercolor paper texture, clean anti-aliased edges, and small-game readability.",
-  palette: ["#ff9fbd", "#bfeeda", "#d9ccff", "#fffdf6", "#8a5b55", "#ffe38f"],
+    "A refined kawaii scrapbook and hand-account sticker style with pastel colors, warm brown pencil linework, cream paper texture, grid-paper composition, washi tape accents, stitched button borders, translucent cup highlights, and small-game readability.",
+  palette: ["#ee9b91", "#aa93d2", "#f3cc86", "#fffaf0", "#6b4a3e", "#b9d9cc"],
   constraints:
     "No brand logos, no readable accidental text, no watermarks, no jagged edges. Keep silhouettes clean enough for a small mobile game canvas.",
 } as const;
@@ -71,7 +71,7 @@ const toppingAssets: ImageAssetDefinition[] = TOPPING_LEVELS.map((level) => ({
   id: level.assetId,
   category: "topping",
   name: level.name,
-  usage: `游戏内等级 ${level.level} 小料主体、进化路线图标、玩家主体兜底图`,
+  usage: `Level ${level.level} topping sprite, evolution icon, and player collectible`,
   fileName: `${level.assetId}.png`,
   status: "generated",
   promptSubject: `${level.name} milk tea topping, refined kawaii hand-account sticker, readable as a shaped collectible at small size, no circular badge backing`,
@@ -83,44 +83,44 @@ export const IMAGE_ASSETS = [
   {
     id: "ui-title-badge",
     category: "ui",
-    name: "标题徽章",
-    usage: "开始界面游戏标题附近的品牌感装饰",
-    fileName: "ui-title-badge.svg",
+    name: "Title badge",
+    usage: "Decorative title plaque for the start screen",
+    fileName: "ui-title-badge.png",
     status: "generated",
-    promptSubject: "a playful milk tea game title badge with no readable text",
+    promptSubject: "a playful blank milk tea game title badge with no readable text",
   },
   {
     id: "ui-start-button",
     category: "ui",
-    name: "开始按钮底图",
-    usage: "主按钮纹理或高光切片",
-    fileName: "ui-start-button.svg",
+    name: "Start button plate",
+    usage: "Primary button texture and highlight plate",
+    fileName: "ui-start-button.png",
     status: "generated",
-    promptSubject: "a glossy rounded start-button plate, blank center, no text",
+    promptSubject: "a glossy rounded stitched start-button plate, blank center, no text",
   },
   {
     id: "ui-leaderboard-medal",
     category: "ui",
-    name: "排行榜奖牌",
-    usage: "排行榜前三名装饰",
-    fileName: "ui-leaderboard-medal.svg",
+    name: "Leaderboard medal",
+    usage: "Leaderboard and score decoration",
+    fileName: "ui-leaderboard-medal.png",
     status: "generated",
     promptSubject: "a tiny milk-tea themed leaderboard medal icon",
   },
   {
     id: "ui-victory-burst",
     category: "ui",
-    name: "胜利爆发图",
-    usage: "合成柿子胜利弹窗背景",
-    fileName: "ui-victory-burst.svg",
+    name: "Victory burst",
+    usage: "Victory result backdrop decoration",
+    fileName: "ui-victory-burst.png",
     status: "generated",
     promptSubject: "a celebratory burst behind a persimmon topping, no text",
   },
   {
     id: "scene-milk-tea-cup",
     category: "scene",
-    name: "奶茶杯",
-    usage: "游戏主场景杯体外观",
+    name: "Milk tea cup",
+    usage: "Main game cup exterior and texture",
     fileName: "scene-milk-tea-cup.png",
     status: "generated",
     promptSubject: "a detailed transparent milk tea cup sticker, tall cup with cute hand-account style linework, empty center for gameplay",
@@ -129,17 +129,17 @@ export const IMAGE_ASSETS = [
   {
     id: "scene-tea-surface",
     category: "scene",
-    name: "奶茶液面",
-    usage: "杯内背景液体纹理",
-    fileName: "scene-tea-surface.svg",
+    name: "Milk tea surface",
+    usage: "Repeating liquid texture inside the cup",
+    fileName: "scene-tea-surface.png",
     status: "generated",
     promptSubject: "warm milk tea liquid surface tile with subtle waves and tapioca speckles",
   },
   {
     id: "scene-straw",
     category: "scene",
-    name: "吸管",
-    usage: "吸管危险事件主体",
+    name: "Straw",
+    usage: "Straw danger event body",
     fileName: "scene-straw.png",
     status: "generated",
     promptSubject: "a detailed pink-and-white striped straw sticker, angled game obstacle with rounded tip and clean silhouette",
@@ -148,9 +148,9 @@ export const IMAGE_ASSETS = [
   {
     id: "effect-shake-wave",
     category: "effect",
-    name: "摇晃波纹",
-    usage: "奶茶杯摇晃提示与进行中效果",
-    fileName: "effect-shake-wave.svg",
+    name: "Shake wave",
+    usage: "Creamy liquid motion effect during shake events",
+    fileName: "effect-shake-wave.png",
     status: "generated",
     promptSubject: "curved creamy liquid motion streaks for a shaking milk tea cup",
     canvasRole: "effect",
@@ -158,8 +158,8 @@ export const IMAGE_ASSETS = [
   {
     id: "effect-suction-ring",
     category: "effect",
-    name: "吸力危险圈",
-    usage: "吸管预警和吸力范围",
+    name: "Suction ring",
+    usage: "Straw warning and suction range decoration",
     fileName: "effect-suction-ring.svg",
     status: "generated",
     promptSubject: "a red-pink suction warning ring with soft hand-painted texture, no text",
@@ -185,16 +185,16 @@ export function getToppingAsset(level: number) {
 
 export function buildImagePrompt(asset: ImageAssetDefinition) {
   return [
-    `Use case: stylized-concept`,
-    `Asset type: ${asset.category} game asset for 摇摇奶茶大合成`,
+    "Use case: stylized-concept",
+    `Asset type: ${asset.category} game asset for Shake Milk Tea`,
     `Primary request: ${asset.promptSubject}`,
-    `Input image: Image 1 is the visual style reference only.`,
+    "Input image: Image 1 is the visual style reference only.",
     `Style/medium: ${REFERENCE_STYLE_PROFILE.description}`,
-    `Composition/framing: centered isolated asset, generous padding, readable at 48px and polished at 256px.`,
-    `Color palette: pastel pink, mint, lavender, cream white, warm milk-tea caramel, soft brown linework.`,
-    `Materials/textures: watercolor paper texture, crisp cream highlights, thin white sticker border, simple shadowless mobile-game silhouette.`,
+    "Composition/framing: centered isolated asset, generous padding, readable at 48px and polished at 256px.",
+    "Color palette: pastel peach pink, lavender, cream white, milk-tea caramel, warm brown linework, tiny mint accents.",
+    "Materials/textures: watercolor paper texture, crisp cream highlights, thin white sticker border, simple shadowless mobile-game silhouette.",
     `Constraints: ${REFERENCE_STYLE_PROFILE.constraints}`,
-    `Avoid: photorealism, messy backgrounds, text, labels, brand marks, watermark, cropped edges.`,
+    "Avoid: photorealism, messy backgrounds, text, labels, brand marks, watermark, cropped edges.",
   ].join("\n");
 }
 
