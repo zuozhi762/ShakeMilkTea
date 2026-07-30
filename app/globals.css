@@ -684,3 +684,79 @@ h2 {
 .image-button:disabled:active {
   transform: none;
 }
+
+.menu-overlay,
+.result-overlay.win,
+.result-overlay.lose {
+  border: 0;
+  box-shadow: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
+.menu-overlay {
+  justify-content: flex-start;
+  gap: 18px;
+  padding-top: 270px;
+  background-image: url("/generated-assets/ui-menu-bg.png");
+}
+
+.menu-overlay::before,
+.result-overlay::before {
+  display: none;
+}
+
+.menu-overlay h1,
+.menu-overlay p {
+  display: none;
+}
+
+.menu-overlay .logo-bubble {
+  width: 126px;
+  height: 112px;
+  transform: none;
+  margin: 0 0 76px;
+}
+
+.result-overlay.win {
+  background-image: url("/generated-assets/ui-result-success-bg.png");
+}
+
+.result-overlay.lose {
+  background-image: url("/generated-assets/ui-result-fail-bg.png");
+}
+
+.result-overlay {
+  justify-content: flex-start;
+  gap: 8px;
+  padding-top: 94px;
+  background-color: transparent;
+}
+
+.result-overlay h2 {
+  display: none;
+}
+
+.result-overlay .logo-bubble {
+  width: 178px;
+  height: 168px;
+  margin-bottom: 0;
+  transform: none;
+}
+
+.result-overlay .reason,
+.result-overlay .stat-grid,
+.result-overlay .name-input,
+.result-overlay .button-row,
+.result-overlay > .image-button {
+  transform: translateY(200px);
+}
+
+.result-overlay .reason {
+  margin: 0 0 4px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.62);
+  font-weight: 850;
+}
