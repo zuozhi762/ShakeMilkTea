@@ -17,7 +17,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
+      <head>
+        <link rel="preload" as="image" href="/generated-assets/page-background.webp" />
+        <link rel="preload" as="image" href="/generated-assets/ui-menu-bg.webp" />
+        <link rel="preload" as="image" href="/generated-assets/ui-title-badge.webp" />
+        <link rel="preload" as="image" href="/generated-assets/ui-start-button.webp" />
+        <link rel="preload" as="image" href="/generated-assets/ui-leaderboard-button.webp" />
+      </head>
       <body>{children}</body>
     </html>
   );
 }
+

@@ -365,18 +365,25 @@ export function MilkTeaGame() {
   const updateTargetFromClient = (clientX: number, clientY: number) => { const canvas = canvasRef.current, runtime = runtimeRef.current; if (!canvas || !runtime || !runtime.running) return; const rect = canvas.getBoundingClientRect(); const x = ((clientX - rect.left) / rect.width) * WIDTH / VIEW_SCALE, y = ((clientY - rect.top) / rect.height) * HEIGHT / VIEW_SCALE; runtime.pointer = runtime.pointer.active ? { ...runtime.pointer, x, y, active: true } : { x, y, smoothX: x, smoothY: y, active: true }; runtime.target.active = false; };
   useEffect(() => {
     let disposed = false;
+    let pendingFrame = 0;
+    const flushRevision = () => {
+      if (disposed) return;
+      pendingFrame = 0;
+      setAssetRevision((value) => value + 1);
+    };
     IMAGE_ASSETS.forEach((asset) => {
       const url = getAssetUrl(asset);
       if (!url) return;
       const image = new Image();
+      image.decoding = "async";
       image.onload = () => {
         if (disposed) return;
         assetImagesRef.current[asset.id] = image;
-        setAssetRevision((value) => value + 1);
+        if (!pendingFrame) pendingFrame = window.requestAnimationFrame(flushRevision);
       };
       image.src = url;
     });
-    return () => { disposed = true; };
+    return () => { disposed = true; if (pendingFrame) window.cancelAnimationFrame(pendingFrame); };
   }, []);
   useEffect(() => { void loadLeaderboard().then(setLeaderboard); }, []);
   useEffect(() => { const down = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k)) { e.preventDefault(); runtimeRef.current?.keys.add(k); } }; const up = (e: KeyboardEvent) => runtimeRef.current?.keys.delete(e.key.toLowerCase()); window.addEventListener("keydown", down); window.addEventListener("keyup", up); return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); }; }, []);
@@ -408,13 +415,15 @@ export function MilkTeaGame() {
     <main className="game-shell" aria-label="\u8fd9\u676f\u6709\u70b9\u592a\u523a\u6fc0\u4e86\u6e38\u620f">
       <section className="phone-frame" aria-label="game area"><div className="hud top-hud"><div><small>{"\u5f53\u524d"}</small><strong>{currentAssetUrl ? <img className="hud-icon" src={currentAssetUrl} alt="" /> : current.emoji} {current.name}</strong></div><div><small>{"\u8fdb\u5ea6"}</small><strong>{hud.progress}/2</strong></div><div><small>{"\u65f6\u95f4"}</small><strong>{formatTime(hud.elapsed)}</strong></div></div><canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="game-canvas" onPointerDown={handlePointer} onPointerMove={handlePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer} aria-label="game canvas" /><div className="hud bottom-hud"><span>{hud.message}</span><b>{hud.score} {"\u5206"}</b></div>
         {status === "playing" && <div ref={joystickRef} className={"joystick" + (joystickActive ? " active" : "")} onPointerDown={startJoystick} onPointerMove={updateJoystick} onPointerUp={stopJoystick} onPointerCancel={stopJoystick} aria-label="virtual joystick"><span ref={joystickKnobRef} /></div>}
-        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u25cb"}</div>{imageButton("\u5f00\u59cb\u6e38\u620f", "/generated-assets/ui-start-button.png", startGame)}{imageButton("\u6392\u884c\u699c", "/generated-assets/ui-leaderboard-button.png", openLeaderboard, "secondary")}</div>}
-        {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" ? <img src="/generated-assets/ui-success-reward.png" alt="" /> : <img src="/generated-assets/ui-fail-burst.png" alt="" />}</div><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row">{imageButton(saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9", "/generated-assets/ui-cream-button.png", persistScore, "cream", saved)}{imageButton("\u518d\u6765\u4e00\u5c40", "/generated-assets/ui-start-button.png", startGame)}</div>{imageButton("\u770b\u6392\u884c\u699c", "/generated-assets/ui-leaderboard-button.png", openLeaderboard, "secondary")}</div>}
-        {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u5168\u5c40\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row">{imageButton("\u5f00\u59cb\u6e38\u620f", "/generated-assets/ui-start-button.png", startGame)}{imageButton("\u8fd4\u56de", "/generated-assets/ui-cream-button.png", () => setStatus("menu"), "cream")}</div></div>}
+        {status === "menu" && <div className="overlay menu-overlay"><div className="logo-bubble">{menuBadgeUrl ? <img src={menuBadgeUrl} alt="" /> : "\u25cb"}</div>{imageButton("\u5f00\u59cb\u6e38\u620f", "/generated-assets/ui-start-button.webp", startGame)}{imageButton("\u6392\u884c\u699c", "/generated-assets/ui-leaderboard-button.webp", openLeaderboard, "secondary")}</div>}
+        {(status === "won" || status === "lost") && finalStats && <div className={"overlay result-overlay " + (status === "won" ? "win" : "lose")}><div className="logo-bubble">{status === "won" ? <img src="/generated-assets/ui-success-reward.webp" alt="" /> : <img src="/generated-assets/ui-fail-burst.webp" alt="" />}</div><p className="reason">{finalStats.reason}</p><div className="stat-grid"><span>{"\u575a\u6301\u65f6\u95f4"} <b>{formatTime(finalStats.elapsed)}</b></span><span>{"\u6700\u9ad8\u7b49\u7ea7"} <b>{finalLevelName}</b></span><span>{"\u6700\u7ec8\u5206\u6570"} <b>{finalStats.score}</b></span></div><label className="name-input">{"\u6392\u884c\u699c\u6635\u79f0"}<input value={playerName} maxLength={12} onChange={(e) => setPlayerName(e.target.value)} /></label><div className="button-row">{imageButton(saved ? "\u5df2\u4fdd\u5b58" : "\u4fdd\u5b58\u6210\u7ee9", "/generated-assets/ui-cream-button.webp", persistScore, "cream", saved)}{imageButton("\u518d\u6765\u4e00\u5c40", "/generated-assets/ui-start-button.webp", startGame)}</div>{imageButton("\u770b\u6392\u884c\u699c", "/generated-assets/ui-leaderboard-button.webp", openLeaderboard, "secondary")}</div>}
+        {status === "leaderboard" && <div className="overlay leaderboard-overlay"><h2>{"\u5168\u5c40\u6392\u884c\u699c"}</h2>{leaderboard.length === 0 ? <p>{"\u8fd8\u6ca1\u6709\u6210\u7ee9\u3002\u7b2c\u4e00\u676f\u5976\u8336\uff0c\u7b49\u4f60\u6765\u6447\u3002"}</p> : <ol className="leaderboard">{leaderboard.map((r, i) => <li key={r.date + r.score + i}><span className="rank">#{i + 1}</span><span className="record-main"><b>{r.name}</b><small>{r.result === "won" ? "\u80dc\u5229" : "\u5931\u8d25"} / {levelInfo(r.highestLevel).name} / {formatTime(r.elapsed)}</small></span><strong>{r.score}</strong></li>)}</ol>}<div className="button-row">{imageButton("\u5f00\u59cb\u6e38\u620f", "/generated-assets/ui-start-button.webp", startGame)}{imageButton("\u8fd4\u56de", "/generated-assets/ui-cream-button.webp", () => setStatus("menu"), "cream")}</div></div>}
       </section>
     </main>
   );
 }
+
+
 
 
 
